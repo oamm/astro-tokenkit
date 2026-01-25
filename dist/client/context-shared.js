@@ -1,8 +1,4 @@
 // packages/astro-tokenkit/src/client/context-shared.ts
-
-import type { TokenKitContext } from '../types';
-import { AsyncLocalStorage } from 'node:async_hooks';
-
 /**
  * OPTION: Share AsyncLocalStorage with other libraries
  *
@@ -21,56 +17,44 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  *
  * setSharedContextStorage(appContext, 'astro');
  */
-
-let sharedStorage: AsyncLocalStorage<any> | null = null;
-let contextKey: string | null = null;
-
+let sharedStorage = null;
+let contextKey = null;
 /**
  * Configure shared AsyncLocalStorage
  *
  * @param storage - Shared AsyncLocalStorage instance
  * @param key - Key to access Astro context in the storage
  */
-export function setSharedContextStorage(
-    storage: AsyncLocalStorage<any>,
-    key: string = 'astro'
-): void {
+export function setSharedContextStorage(storage, key = 'astro') {
     sharedStorage = storage;
     contextKey = key;
 }
-
 /**
  * Get context from shared storage
  */
-export function getContext(explicitCtx?: TokenKitContext): TokenKitContext {
+export function getContext(explicitCtx) {
     if (explicitCtx) {
         return explicitCtx;
     }
-
     if (sharedStorage && contextKey) {
         const store = sharedStorage.getStore();
-        const ctx = store?.[contextKey];
+        const ctx = store === null || store === void 0 ? void 0 : store[contextKey];
         if (ctx) {
             return ctx;
         }
     }
-
-    throw new Error(
-        'Astro context not found. Either:\n' +
+    throw new Error('Astro context not found. Either:\n' +
         '1. Pass context explicitly: api.get("/path", { ctx: Astro })\n' +
-        '2. Configure shared storage: setSharedContextStorage(storage, "key")'
-    );
+        '2. Configure shared storage: setSharedContextStorage(storage, "key")');
 }
-
 /**
  * Bind context (only needed if not using shared storage)
  */
-export function bindContext<T>(ctx: TokenKitContext, fn: () => T): T {
+export function bindContext(ctx, fn) {
     if (sharedStorage && contextKey) {
         const currentStore = sharedStorage.getStore() || {};
-        return sharedStorage.run({ ...currentStore, [contextKey]: ctx }, fn);
+        return sharedStorage.run(Object.assign(Object.assign({}, currentStore), { [contextKey]: ctx }), fn);
     }
-
     // Fallback: context must be passed explicitly
     return fn();
 }

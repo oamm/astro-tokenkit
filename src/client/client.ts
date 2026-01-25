@@ -1,28 +1,25 @@
 // packages/astro-tokenkit/src/client/client.ts
 
-import type { AstroGlobal, MiddlewareHandler } from 'astro';
-
-import type {
-    ClientConfig,
-    RequestOptions,
-    RequestConfig,
-    APIResponse,
-    Session,
-} from '../types';
-import { APIError, AuthError, NetworkError, TimeoutError } from '../types';
-import { TokenManager } from '../auth/manager';
-import { getContext, bindContext } from './context';
-import { shouldRetry, calculateDelay, sleep } from '../utils/retry';
+import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext,} from '../types';
+import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
+import {TokenManager} from '../auth/manager';
+import {type ContextOptions, getContext} from './context';
+import {calculateDelay, shouldRetry, sleep} from '../utils/retry';
 
 /**
  * API Client
  */
 export class APIClient {
-    private tokenManager?: TokenManager;
+    public tokenManager?: TokenManager;
     private config: ClientConfig;
+    public contextOptions: ContextOptions;
 
     constructor(config: ClientConfig) {
         this.config = config;
+        this.contextOptions = {
+            context: config.context,
+            getContextStore: config.getContextStore,
+        };
 
         // Initialize token manager if auth is configured
         if (config.auth) {
@@ -92,7 +89,7 @@ export class APIClient {
      * Generic request method
      */
     async request<T = any>(config: RequestConfig): Promise<T> {
-        const ctx = getContext(config.ctx);
+        const ctx = getContext(config.ctx, this.contextOptions);
         let attempt = 0;
         let lastError: Error | undefined;
 
@@ -106,8 +103,7 @@ export class APIClient {
                 lastError = error as Error;
 
                 // Check if we should retry
-                const status = (error as APIError).status;
-                if (shouldRetry(status, attempt, this.config.retry)) {
+                if (shouldRetry((error as APIError).status, attempt, this.config.retry)) {
                     const delay = calculateDelay(attempt, this.config.retry);
                     await sleep(delay);
                     continue;
@@ -124,7 +120,7 @@ export class APIClient {
      */
     private async executeRequest<T>(
         config: RequestConfig,
-        ctx: AstroGlobal,
+        ctx: TokenKitContext,
         attempt: number
     ): Promise<APIResponse<T>> {
         // Ensure valid session (if auth is enabled)
@@ -282,7 +278,7 @@ export class APIClient {
     /**
      * Build request headers
      */
-    private buildHeaders(config: RequestConfig, ctx: AstroGlobal): HeadersInit {
+    private buildHeaders(config: RequestConfig, ctx: TokenKitContext): HeadersInit {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             ...this.config.headers,
@@ -304,55 +300,47 @@ export class APIClient {
     /**
      * Login
      */
-    async login(credentials: any, ctx?: AstroGlobal): Promise<void> {
+    async login(credentials: any, ctx?: TokenKitContext): Promise<void> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }
 
-        const context = getContext(ctx);
+        const context = getContext(ctx, this.contextOptions);
         await this.tokenManager.login(context, credentials);
     }
 
     /**
      * Logout
      */
-    async logout(ctx?: AstroGlobal): Promise<void> {
+    async logout(ctx?: TokenKitContext): Promise<void> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }
 
-        const context = getContext(ctx);
+        const context = getContext(ctx, this.contextOptions);
         await this.tokenManager.logout(context);
     }
 
     /**
      * Check if authenticated
      */
-    isAuthenticated(ctx?: AstroGlobal): boolean {
+    isAuthenticated(ctx?: TokenKitContext): boolean {
         if (!this.tokenManager) return false;
 
-        const context = getContext(ctx);
+        const context = getContext(ctx, this.contextOptions);
         return this.tokenManager.isAuthenticated(context);
     }
 
     /**
      * Get current session
      */
-    getSession(ctx?: AstroGlobal): Session | null {
+    getSession(ctx?: TokenKitContext): Session | null {
         if (!this.tokenManager) return null;
 
-        const context = getContext(ctx);
+        const context = getContext(ctx, this.contextOptions);
         return this.tokenManager.getSession(context);
     }
 
-    /**
-     * Create middleware for context binding
-     */
-    middleware(): MiddlewareHandler {
-        return async (ctx, next) => {
-            return bindContext(ctx, () => next());
-        };
-    }
 }
 
 /**

@@ -1,7 +1,6 @@
 // packages/astro-tokenkit/src/auth/storage.ts
 
-import type { AstroGlobal } from 'astro';
-import type { TokenBundle, CookieConfig } from '../types';
+import type { TokenBundle, CookieConfig, TokenKitContext } from '../types';
 
 /**
  * Cookie names
@@ -44,7 +43,7 @@ export function getCookieOptions(config: CookieConfig = {}) {
  * Store token bundle in cookies
  */
 export function storeTokens(
-    ctx: AstroGlobal,
+    ctx: TokenKitContext,
     bundle: TokenBundle,
     cookieConfig: CookieConfig = {}
 ): void {
@@ -91,7 +90,7 @@ export function storeTokens(
  * Retrieve tokens from cookies
  */
 export function retrieveTokens(
-    ctx: AstroGlobal,
+    ctx: TokenKitContext,
     cookieConfig: CookieConfig = {}
 ): {
     accessToken: string | null;
@@ -116,7 +115,7 @@ export function retrieveTokens(
 /**
  * Clear all auth cookies
  */
-export function clearTokens(ctx: AstroGlobal, cookieConfig: CookieConfig = {}): void {
+export function clearTokens(ctx: TokenKitContext, cookieConfig: CookieConfig = {}): void {
     const names = getCookieNames(cookieConfig.prefix);
     const options = getCookieOptions(cookieConfig);
 

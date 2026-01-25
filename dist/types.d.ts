@@ -1,19 +1,15 @@
-// packages/astro-tokenkit/src/types.ts
-
 import type { AstroCookies } from 'astro';
 import { AsyncLocalStorage } from 'node:async_hooks';
-
 /**
  * Token bundle returned from auth endpoints
  */
 export interface TokenBundle {
     accessToken: string;
     refreshToken: string;
-    accessExpiresAt: number; // Unix timestamp in seconds
+    accessExpiresAt: number;
     refreshExpiresAt?: number;
     sessionPayload?: Record<string, any>;
 }
-
 /**
  * Minimal context required by TokenKit
  */
@@ -21,7 +17,6 @@ export interface TokenKitContext {
     cookies: AstroCookies;
     [key: string]: any;
 }
-
 /**
  * Session information
  */
@@ -30,7 +25,6 @@ export interface Session {
     expiresAt: number;
     payload?: Record<string, any>;
 }
-
 /**
  * Request options
  */
@@ -48,7 +42,6 @@ export interface RequestOptions {
     /** Custom signal for cancellation */
     signal?: AbortSignal;
 }
-
 /**
  * Request configuration
  */
@@ -57,7 +50,6 @@ export interface RequestConfig extends RequestOptions {
     url: string;
     data?: any;
 }
-
 /**
  * HTTP response
  */
@@ -68,7 +60,6 @@ export interface APIResponse<T = any> {
     headers: Headers;
     url: string;
 }
-
 /**
  * Field mapping for auto-detection
  */
@@ -79,7 +70,6 @@ export interface FieldMapping {
     expiresIn?: string;
     sessionPayload?: string;
 }
-
 /**
  * Auth configuration
  */
@@ -90,25 +80,19 @@ export interface AuthConfig {
     refresh: string;
     /** Logout endpoint (optional, relative to baseURL) */
     logout?: string;
-
     /** Field mapping (auto-detected if not provided) */
     fields?: FieldMapping;
-
     /** Custom login response parser */
     parseLogin?: (body: any) => TokenBundle;
     /** Custom refresh response parser */
     parseRefresh?: (body: any) => TokenBundle;
-
     /** Custom token injection function (default: Bearer) */
     injectToken?: (token: string) => string;
-
     /** Refresh policy */
     policy?: RefreshPolicy;
-
     /** Cookie configuration */
     cookies?: CookieConfig;
 }
-
 /**
  * Refresh policy
  */
@@ -120,7 +104,6 @@ export interface RefreshPolicy {
     /** Minimum interval between refreshes (e.g., '30s' or 30) */
     minInterval?: string | number;
 }
-
 /**
  * Cookie configuration
  */
@@ -134,7 +117,6 @@ export interface CookieConfig {
     /** Cookie names prefix */
     prefix?: string;
 }
-
 /**
  * Retry configuration
  */
@@ -148,31 +130,18 @@ export interface RetryConfig {
     /** Initial delay in ms */
     delay?: number;
 }
-
 /**
  * Request interceptor
  */
-export type RequestInterceptor = (
-    config: RequestConfig,
-    ctx?: TokenKitContext
-) => RequestConfig | Promise<RequestConfig>;
-
+export type RequestInterceptor = (config: RequestConfig, ctx?: TokenKitContext) => RequestConfig | Promise<RequestConfig>;
 /**
  * Response interceptor
  */
-export type ResponseInterceptor = <T = any>(
-    response: APIResponse<T>,
-    ctx?: TokenKitContext
-) => APIResponse<T> | Promise<APIResponse<T>>;
-
+export type ResponseInterceptor = <T = any>(response: APIResponse<T>, ctx?: TokenKitContext) => APIResponse<T> | Promise<APIResponse<T>>;
 /**
  * Error interceptor
  */
-export type ErrorInterceptor = (
-    error: APIError,
-    ctx?: TokenKitContext
-) => never | Promise<never>;
-
+export type ErrorInterceptor = (error: APIError, ctx?: TokenKitContext) => never | Promise<never>;
 /**
  * Interceptors configuration
  */
@@ -181,77 +150,51 @@ export interface InterceptorsConfig {
     response?: ResponseInterceptor[];
     error?: ErrorInterceptor[];
 }
-
 /**
  * Client configuration
  */
 export interface ClientConfig {
     /** Base URL for all requests */
     baseURL: string;
-
     /** Auth configuration (optional for non-auth clients) */
     auth?: AuthConfig;
-
     /** Default headers for all requests */
     headers?: Record<string, string>;
-
     /** Default timeout in ms */
     timeout?: number;
-
     /** Retry configuration */
     retry?: RetryConfig;
-
     /** Interceptors */
     interceptors?: InterceptorsConfig;
-
     /** External AsyncLocalStorage instance (optional) */
     context?: AsyncLocalStorage<any>;
-
     /** Method to get the context store (optional) */
     getContextStore?: () => TokenKitContext | undefined | null;
 }
-
 /**
  * API Error
  */
-export class APIError extends Error {
-    constructor(
-        message: string,
-        public status?: number,
-        public response?: any,
-        public request?: RequestConfig
-    ) {
-        super(message);
-        this.name = 'APIError';
-    }
+export declare class APIError extends Error {
+    status?: number | undefined;
+    response?: any | undefined;
+    request?: RequestConfig | undefined;
+    constructor(message: string, status?: number | undefined, response?: any | undefined, request?: RequestConfig | undefined);
 }
-
 /**
  * Authentication Error
  */
-export class AuthError extends APIError {
-    constructor(message: string, status?: number, response?: any, request?: RequestConfig) {
-        super(message, status, response, request);
-        this.name = 'AuthError';
-    }
+export declare class AuthError extends APIError {
+    constructor(message: string, status?: number, response?: any, request?: RequestConfig);
 }
-
 /**
  * Network Error
  */
-export class NetworkError extends APIError {
-    constructor(message: string, request?: RequestConfig) {
-        super(message, undefined, undefined, request);
-        this.name = 'NetworkError';
-    }
+export declare class NetworkError extends APIError {
+    constructor(message: string, request?: RequestConfig);
 }
-
 /**
  * Timeout Error
  */
-export class TimeoutError extends APIError {
-    constructor(message: string, request?: RequestConfig) {
-        super(message, undefined, undefined, request);
-        this.name = 'TimeoutError';
-    }
+export declare class TimeoutError extends APIError {
+    constructor(message: string, request?: RequestConfig);
 }

@@ -1,14 +1,69 @@
 {
   "name": "astro-tokenkit",
   "version": "1.0.0",
-  "description": "",
+  "description": "A powerful API client for Astro with automatic token rotation, session management, and seamless context integration.",
   "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "auth",
+    "token",
+    "jwt",
+    "api-client",
+    "refresh-token",
+    "middleware"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc --project tsconfig.json",
+    "types:bundle": "rollup -c rollup.config.mjs",
+    "clean": "rimraf dist",
+    "dev": "tsc --watch --project tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench run bench/",
+    "prepublishOnly": "npm run clean && npm run build && npm run types:bundle",
+    "prepare": "npm run prepublishOnly"
   },
-  "dependencies": {},
+  "dependencies": {
+
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0 || ^5.0.0"
+  },
   "devDependencies": {
-    "typescript": "^5.5.3"
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/node": "^20.11.0",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.56.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
   },
-  "private": true
+  "private": false,
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oamm/astro-tokenkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oamm/astro-tokenkit/issues"
+  },
+  "homepage": "https://github.com/oamm/astro-tokenkit#readme"
 }

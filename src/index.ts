@@ -3,6 +3,12 @@
 // Main client
 export { createClient, APIClient } from './client/client';
 
+// Integration
+export { tokenKit, defineMiddleware } from './integration';
+
+// Middleware
+export { createMiddleware } from './middleware';
+
 // Types
 export type {
     ClientConfig,

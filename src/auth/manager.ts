@@ -1,7 +1,6 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
-import type { AstroGlobal } from 'astro';
-import type { TokenBundle, Session, AuthConfig } from '../types';
+import type { TokenBundle, Session, AuthConfig, TokenKitContext } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
@@ -53,7 +52,7 @@ export class TokenManager {
     /**
      * Perform login
      */
-    async login(ctx: AstroGlobal, credentials: any): Promise<TokenBundle> {
+    async login(ctx: TokenKitContext, credentials: any): Promise<TokenBundle> {
         const url = this.baseURL + this.config.login;
 
         const response = await fetch(url, {
@@ -82,7 +81,7 @@ export class TokenManager {
     /**
      * Perform token refresh
      */
-    async refresh(ctx: AstroGlobal, refreshToken: string): Promise<TokenBundle | null> {
+    async refresh(ctx: TokenKitContext, refreshToken: string): Promise<TokenBundle | null> {
         const url = this.baseURL + this.config.refresh;
 
         try {
@@ -126,7 +125,7 @@ export class TokenManager {
     /**
      * Ensure valid tokens (with automatic refresh)
      */
-    async ensure(ctx: AstroGlobal): Promise<Session | null> {
+    async ensure(ctx: TokenKitContext): Promise<Session | null> {
         const now = Math.floor(Date.now() / 1000);
         const tokens = retrieveTokens(ctx, this.config.cookies);
 
@@ -184,7 +183,7 @@ export class TokenManager {
     /**
      * Logout (clear tokens)
      */
-    async logout(ctx: AstroGlobal): Promise<void> {
+    async logout(ctx: TokenKitContext): Promise<void> {
         // Optionally call logout endpoint
         if (this.config.logout) {
             try {
@@ -202,7 +201,7 @@ export class TokenManager {
     /**
      * Get current session (no refresh)
      */
-    getSession(ctx: AstroGlobal): Session | null {
+    getSession(ctx: TokenKitContext): Session | null {
         const tokens = retrieveTokens(ctx, this.config.cookies);
 
         if (!tokens.accessToken || !tokens.expiresAt) {
@@ -219,7 +218,7 @@ export class TokenManager {
     /**
      * Check if authenticated
      */
-    isAuthenticated(ctx: AstroGlobal): boolean {
+    isAuthenticated(ctx: TokenKitContext): boolean {
         const tokens = retrieveTokens(ctx, this.config.cookies);
         return !!(tokens.accessToken && tokens.refreshToken);
     }
