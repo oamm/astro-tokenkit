@@ -25,6 +25,7 @@ export type {
     RequestInterceptor,
     ResponseInterceptor,
     ErrorInterceptor,
+    TokenKitContext
 } from './types';
 
 // Errors
