@@ -721,8 +721,7 @@ class APIClient {
                 }
                 catch (error) {
                     // Check if we should retry
-                    const status = error.status;
-                    if (shouldRetry(status, attempt, this.config.retry)) {
+                    if (shouldRetry(error.status, attempt, this.config.retry)) {
                         const delay = calculateDelay(attempt, this.config.retry);
                         yield sleep(delay);
                         continue;

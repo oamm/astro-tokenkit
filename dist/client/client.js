@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import { APIError, AuthError, NetworkError, TimeoutError } from '../types';
 import { TokenManager } from '../auth/manager';
 import { getContext } from './context';
-import { shouldRetry, calculateDelay, sleep } from '../utils/retry';
+import { calculateDelay, shouldRetry, sleep } from '../utils/retry';
 /**
  * API Client
  */
@@ -87,8 +87,7 @@ export class APIClient {
                 catch (error) {
                     lastError = error;
                     // Check if we should retry
-                    const status = error.status;
-                    if (shouldRetry(status, attempt, this.config.retry)) {
+                    if (shouldRetry(error.status, attempt, this.config.retry)) {
                         const delay = calculateDelay(attempt, this.config.retry);
                         yield sleep(delay);
                         continue;

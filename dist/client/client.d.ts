@@ -1,4 +1,4 @@
-import type { ClientConfig, RequestOptions, RequestConfig, Session, TokenKitContext } from '../types';
+import type { ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext } from '../types';
 import { TokenManager } from '../auth/manager';
 import { type ContextOptions } from './context';
 /**

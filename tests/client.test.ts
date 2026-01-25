@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClient, defineMiddleware } from '../src';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { TokenKitContext } from '../src/types';
+import type { APIContext } from 'astro';
 
 describe('APIClient with context options', () => {
     const mockAstro = {
@@ -11,7 +11,7 @@ describe('APIClient with context options', () => {
             delete: vi.fn(),
         },
         request: new Request('http://localhost'),
-    } as unknown as TokenKitContext;
+    } as unknown as APIContext;
 
     beforeEach(() => {
         vi.clearAllMocks();

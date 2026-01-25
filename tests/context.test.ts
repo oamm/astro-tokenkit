@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getContext, bindContext } from '../src/client/context';
-import type { TokenKitContext } from '../src/types';
+import type { TokenKitContext } from '../src';
+import type { APIContext } from 'astro';
 
 describe('context handling', () => {
     const mockAstro = {
