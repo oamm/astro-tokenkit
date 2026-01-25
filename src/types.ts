@@ -99,6 +99,9 @@ export interface AuthConfig {
     /** Custom refresh response parser */
     parseRefresh?: (body: any) => TokenBundle;
 
+    /** Callback after successful login */
+    onLogin?: (bundle: TokenBundle, body: any, ctx: TokenKitContext) => void | Promise<void>;
+
     /** Custom token injection function (default: Bearer) */
     injectToken?: (token: string) => string;
 

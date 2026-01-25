@@ -1,5 +1,6 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
+import { AuthError } from '../types';
 import type { TokenBundle, Session, AuthConfig, TokenKitContext } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
@@ -59,21 +60,33 @@ export class TokenManager {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(credentials),
+        }).catch(error => {
+            throw new AuthError(`Login request failed: ${error.message}`);
         });
 
         if (!response.ok) {
-            throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+            throw new AuthError(`Login failed: ${response.status} ${response.statusText}`, response.status, response);
         }
 
-        const body = await response.json();
+        const body = await response.json().catch(() => ({}));
 
         // Parse response
-        const bundle = this.config.parseLogin
-            ? this.config.parseLogin(body)
-            : autoDetectFields(body, this.config.fields);
+        let bundle: TokenBundle;
+        try {
+            bundle = this.config.parseLogin
+                ? this.config.parseLogin(body)
+                : autoDetectFields(body, this.config.fields);
+        } catch (error: any) {
+            throw new AuthError(`Invalid login response: ${error.message}`, response.status, response);
+        }
 
         // Store in cookies
         storeTokens(ctx, bundle, this.config.cookies);
+
+        // Call onLogin callback if provided
+        if (this.config.onLogin) {
+            await this.config.onLogin(bundle, body, ctx);
+        }
 
         return bundle;
     }
@@ -82,44 +95,58 @@ export class TokenManager {
      * Perform token refresh
      */
     async refresh(ctx: TokenKitContext, refreshToken: string): Promise<TokenBundle | null> {
-        const url = this.baseURL + this.config.refresh;
-
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken }),
-            });
-
-            if (!response.ok) {
-                // 401/403 = invalid refresh token
-                if (response.status === 401 || response.status === 403) {
-                    clearTokens(ctx, this.config.cookies);
-                    return null;
-                }
-                throw new Error(`Refresh failed: ${response.status} ${response.statusText}`);
-            }
-
-            const body = await response.json();
-
-            // Parse response
-            const bundle = this.config.parseRefresh
-                ? this.config.parseRefresh(body)
-                : autoDetectFields(body, this.config.fields);
-
-            // Validate bundle
-            if (!bundle.accessToken || !bundle.refreshToken || !bundle.accessExpiresAt) {
-                throw new Error('Invalid token bundle returned from refresh endpoint');
-            }
-
-            // Store new tokens
-            storeTokens(ctx, bundle, this.config.cookies);
-
-            return bundle;
+            return await this.performRefresh(ctx, refreshToken);
         } catch (error) {
             clearTokens(ctx, this.config.cookies);
             throw error;
         }
+    }
+
+    /**
+     * Internal refresh implementation
+     */
+    private async performRefresh(ctx: TokenKitContext, refreshToken: string): Promise<TokenBundle | null> {
+        const url = this.baseURL + this.config.refresh;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+        }).catch(error => {
+            throw new AuthError(`Refresh request failed: ${error.message}`);
+        });
+
+        if (!response.ok) {
+            // 401/403 = invalid refresh token
+            if (response.status === 401 || response.status === 403) {
+                clearTokens(ctx, this.config.cookies);
+                return null;
+            }
+            throw new AuthError(`Refresh failed: ${response.status} ${response.statusText}`, response.status, response);
+        }
+
+        const body = await response.json().catch(() => ({}));
+
+        // Parse response
+        let bundle: TokenBundle;
+        try {
+            bundle = this.config.parseRefresh
+                ? this.config.parseRefresh(body)
+                : autoDetectFields(body, this.config.fields);
+        } catch (error: any) {
+            throw new AuthError(`Invalid refresh response: ${error.message}`, response.status, response);
+        }
+
+        // Validate bundle
+        if (!bundle.accessToken || !bundle.refreshToken || !bundle.accessExpiresAt) {
+            throw new AuthError('Invalid token bundle returned from refresh endpoint', response.status, response);
+        }
+
+        // Store new tokens
+        storeTokens(ctx, bundle, this.config.cookies);
+
+        return bundle;
     }
 
     /**
