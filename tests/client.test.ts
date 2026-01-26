@@ -20,6 +20,7 @@ describe('APIClient with global config', () => {
             baseURL: '',
             auth: undefined,
             getContextStore: undefined,
+            setContextStore: undefined,
             runWithContext: undefined,
             context: undefined,
         });
@@ -27,6 +28,7 @@ describe('APIClient with global config', () => {
 
     it('should use global config in login', async () => {
         const getContextStore = vi.fn(() => mockAstro);
+        const setContextStore = vi.fn();
         setConfig({
             baseURL: 'https://api.example.com',
             auth: {
@@ -35,6 +37,7 @@ describe('APIClient with global config', () => {
                 logout: '/logout',
             },
             getContextStore,
+            setContextStore,
         });
 
         const client = createClient();
@@ -111,9 +114,11 @@ describe('APIClient with global config', () => {
 
     it('should skip runWithContext in middleware if getContextStore is defined globally', async () => {
         const getContextStore = vi.fn(() => mockAstro);
+        const setContextStore = vi.fn();
         setConfig({
             baseURL: 'https://api.example.com',
             getContextStore,
+            setContextStore,
         });
 
         const client = createClient();
@@ -140,10 +145,12 @@ describe('APIClient with global config', () => {
 
     it('should NOT skip runWithContext in middleware if both getContextStore and runWithContext are defined globally', async () => {
         const getContextStore = vi.fn(() => mockAstro);
+        const setContextStore = vi.fn();
         const runWithContext = vi.fn((ctx, fn) => fn());
         setConfig({
             baseURL: 'https://api.example.com',
             getContextStore,
+            setContextStore,
             runWithContext,
         });
 
@@ -155,5 +162,31 @@ describe('APIClient with global config', () => {
         expect(result).toBe('next-result');
         expect(next).toHaveBeenCalled();
         expect(runWithContext).toHaveBeenCalled();
+    });
+
+    it('should initialize context store via setContextStore if getContextStore returns null', async () => {
+        let storedCtx: any = null;
+        const getContextStore = vi.fn(() => storedCtx);
+        const setContextStore = vi.fn((ctx) => { storedCtx = ctx; });
+        
+        setConfig({
+            baseURL: 'https://api.example.com',
+            getContextStore,
+            setContextStore,
+        });
+
+        const next = vi.fn().mockResolvedValue('next-result');
+        const middleware = defineMiddleware();
+
+        const result = await middleware(mockAstro, next);
+
+        expect(result).toBe('next-result');
+        expect(next).toHaveBeenCalled();
+        expect(getContextStore).toHaveBeenCalled();
+        expect(setContextStore).toHaveBeenCalledWith(expect.objectContaining({
+            cookies: mockAstro.cookies
+        }));
+        expect(storedCtx).not.toBeNull();
+        expect(storedCtx.cookies).toBe(mockAstro.cookies);
     });
 });

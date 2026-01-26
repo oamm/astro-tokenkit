@@ -13,6 +13,7 @@ export interface ResolvedConfig extends TokenKitConfig {
 let config: ResolvedConfig = {
     runWithContext: undefined,
     getContextStore: undefined,
+    setContextStore: undefined,
     baseURL: "",
 };
 
@@ -22,11 +23,18 @@ let tokenManager: TokenManager | undefined;
  * Set configuration
  */
 export function setConfig(userConfig: TokenKitConfig): void {
-    // Store validated config
-    config = {
+    const finalConfig = {
         ...config,
         ...userConfig,
     } as ResolvedConfig;
+
+    // Validate that getter and setter are defined together
+    if ((finalConfig.getContextStore && !finalConfig.setContextStore) || 
+        (!finalConfig.getContextStore && finalConfig.setContextStore)) {
+        throw new Error("[TokenKit] getContextStore and setContextStore must be defined together.");
+    }
+
+    config = finalConfig;
 
     // Re-initialize global token manager if auth changed
     if (config.auth) {

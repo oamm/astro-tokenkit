@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { getContextStore, runWithContext } from '../src/client/context';
 import type { TokenKitContext } from '../src';
 import type { APIContext } from 'astro';
-import { setConfig } from '../src/config';
+import { setConfig } from '../src';
 
 describe('context handling', () => {
     const mockAstro = {
@@ -15,6 +15,7 @@ describe('context handling', () => {
         // Reset config before each test
         setConfig({
             getContextStore: undefined,
+            setContextStore: undefined,
             runWithContext: undefined,
             context: undefined,
         });
@@ -42,7 +43,11 @@ describe('context handling', () => {
 
     it('should use getContextStore option', () => {
         const customGetContextStore = vi.fn(() => mockAstro);
-        setConfig({ getContextStore: customGetContextStore });
+        const customSetContextStore = vi.fn();
+        setConfig({ 
+            getContextStore: customGetContextStore,
+            setContextStore: customSetContextStore
+        });
 
         const ctx = getContextStore();
         expect(ctx).toBe(mockAstro);
@@ -53,7 +58,11 @@ describe('context handling', () => {
         const explicitAstro = { id: 'explicit', cookies: new Map() } as unknown as TokenKitContext;
         const storeAstro = { id: 'store', cookies: new Map() } as unknown as TokenKitContext;
         const customGetContextStore = () => storeAstro;
-        setConfig({ getContextStore: customGetContextStore });
+        const customSetContextStore = (_: any) => {};
+        setConfig({ 
+            getContextStore: customGetContextStore,
+            setContextStore: customSetContextStore
+        });
 
         const ctx = getContextStore(explicitAstro);
         expect(ctx).toBe(explicitAstro);

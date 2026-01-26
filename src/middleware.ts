@@ -13,13 +13,13 @@ export function createMiddleware(): MiddlewareHandler {
         const config = getConfig();
 
         const runLogic = async () => {
-            // Proactively ensure valid session if auth is configured
+            // Proactively ensure a valid session if auth is configured
             if (tokenManager) {
                 try {
                     // This handles token rotation (refresh) if needed
                     await tokenManager.ensure(ctx);
                 } catch (error) {
-                    // Log but don't block request if rotation fails
+                    // Log but don't block a request if rotation fails
                     console.error('[TokenKit] Automatic token rotation failed:', error);
                 }
             }
@@ -30,12 +30,15 @@ export function createMiddleware(): MiddlewareHandler {
         // We skip runWithContext to avoid nesting ALS.run() unnecessarily,
         // UNLESS a custom runWithContext is provided.
         if (config.getContextStore && !config.runWithContext) {
-            const storage = config.getContextStore();
-            if (storage) {
+            let storage = config.getContextStore();
+
+            if (storage)
+                // Update existing reference
                 storage.cookies = ctx.cookies;
-            } else {
-                console.error("[TokenKit] getContextStore returned null or undefined")
-            }
+            else if (config.setContextStore)
+                config.setContextStore({cookies: ctx.cookies});
+            else
+                console.error("[TokenKit] getContextStore returned null or undefined and no setter was found");
             return runLogic();
         }
         const runner = config.runWithContext ?? defaultRunWithContext;

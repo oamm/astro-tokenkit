@@ -225,6 +225,9 @@ export interface ClientConfig {
     
     /** Custom context store getter */
     getContextStore?: () => TokenKitContext | undefined | null;
+
+    /** Custom context store setter */
+    setContextStore?: (ctx: TokenKitContext) => void;
     
     /** Custom context runner */
     runWithContext?: <T>(ctx: TokenKitContext, fn: () => T) => T;
