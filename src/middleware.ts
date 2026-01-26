@@ -1,8 +1,8 @@
 // packages/astro-tokenkit/src/middleware.ts
 
-import type { MiddlewareHandler } from 'astro';
-import { runWithContext as defaultRunWithContext } from './client/context';
-import { getConfig, getTokenManager } from './config';
+import type {MiddlewareHandler} from 'astro';
+import {runWithContext as defaultRunWithContext} from './client/context';
+import {getConfig, getTokenManager} from './config';
 
 /**
  * Create middleware for context binding and automatic token rotation
@@ -30,6 +30,12 @@ export function createMiddleware(): MiddlewareHandler {
         // We skip runWithContext to avoid nesting ALS.run() unnecessarily,
         // UNLESS a custom runWithContext is provided.
         if (config.getContextStore && !config.runWithContext) {
+            const storage = config.getContextStore();
+            if (storage) {
+                storage.cookies = ctx.cookies;
+            } else {
+                console.error("[TokenKit] getContextStore returned null or undefined")
+            }
             return runLogic();
         }
         const runner = config.runWithContext ?? defaultRunWithContext;
