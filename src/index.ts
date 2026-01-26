@@ -30,8 +30,6 @@ export type {
     ErrorInterceptor,
     TokenKitContext,
     TokenKitConfig,
-    ProtectionRule,
-    AccessHooks,
 } from './types';
 
 // Errors

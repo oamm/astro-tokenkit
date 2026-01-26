@@ -19,17 +19,9 @@ pnpm add astro-tokenkit
 
 ## Quick Start
 
-### 1. Create your API Client
+### 1. Add the Integration
 
-```typescript
-// src/lib/api.ts
-import { createClient } from 'astro-tokenkit';
-
-// Uses global configuration from the integration by default
-export const api = createClient();
-```
-
-### 2. Add the Integration
+Configure TokenKit in your `astro.config.mjs`. This sets the global configuration for the entire app.
 
 ```javascript
 // astro.config.mjs
@@ -43,35 +35,31 @@ export default defineConfig({
       auth: {
         login: '/auth/login',
         refresh: '/auth/refresh',
-        logout: '/auth/logout',
-      },
-      protect: [
-        { pattern: '/admin', role: 'admin' },
-        { pattern: '/dashboard', roles: ['user', 'admin'] },
-        { pattern: '/settings', permissions: ['settings:write'] }
-      ],
-      loginPath: '/login'
+      }
     })
   ],
 });
 ```
 
-### 3. Setup Middleware
+### 2. Setup Middleware
+
+Create `src/middleware.ts` to automatically handle context binding and token rotation. You can use the exported `api` singleton's middleware:
 
 ```typescript
 // src/middleware.ts
-import { defineMiddleware } from 'astro-tokenkit';
+import { api } from 'astro-tokenkit';
 
-// Automatically handles context binding and token rotation using global config
-export const onRequest = defineMiddleware();
+export const onRequest = api.middleware();
 ```
 
-### 4. Use in Pages
+### 3. Use in Pages
+
+Now you can use the `api` client anywhere in your Astro pages or components without worrying about passing context.
 
 ```astro
 ---
 // src/pages/profile.astro
-import { api } from '../lib/api';
+import { api } from 'astro-tokenkit';
 
 // No need to pass context, it's handled by middleware!
 const user = await api.get('/me');
@@ -92,44 +80,25 @@ setConfig({
   auth: {
     login: '/auth/login',
     refresh: '/auth/refresh',
-  },
-  loginPath: '/login',
-  protect: [
-    { pattern: '/admin' },
-    { pattern: '/profile', redirectTo: '/auth/signin' }
-  ],
-  access: {
-    check: (session) => session?.payload?.role === 'admin'
   }
 });
 ```
 
-### Route Protection
+### API Singleton
 
-You can define protection rules in your configuration. The middleware will automatically check these rules and redirect unauthenticated or unauthorized users.
+The library exports a global `api` instance that is automatically synchronized with your configuration.
 
-| Property | Type | Description |
-| :--- | :--- | :--- |
-| `pattern` | `string` | URL pattern to match (starts with). |
-| `redirectTo`| `string` | Optional custom redirect path. |
-| `role` | `string` | Required role for this pattern. |
-| `roles` | `string[]` | List of allowed roles (any one will grant access). |
-| `permissions`| `string[]` | List of required permissions (all are required). |
+- **Dynamic Sync**: If you update the configuration via `setConfig()`, the `api` instance immediately reflects these changes.
+- **Shared Manager**: The `api` instance uses a global `TokenManager` which ensures that token refreshes are synchronized across all requests (preventing race conditions).
+- **Middleware Integration**: Use `api.middleware()` for a seamless setup in Astro.
 
-### Access Control
-
-Use the `access` hooks to implement fine-grained authorization logic.
+If you need a specialized client with a different configuration, you can still create one:
 
 ```typescript
-setConfig({
-  access: {
-    getRole: (session) => session?.payload?.role ?? null,
-    getPermissions: (session) => session?.payload?.permissions ?? [],
-    check: async (session, ctx) => {
-      // Custom async check
-      return true;
-    }
-  }
+import { createClient } from 'astro-tokenkit';
+
+const specializedClient = createClient({
+  baseURL: 'https://another-api.com'
 });
 ```
 
@@ -157,6 +126,10 @@ setConfig({
 | `refresh` | `string` | Endpoint path for token refresh (POST). |
 | `logout` | `string` | Endpoint path for logout (POST). |
 | `fields` | `FieldMapping` | Custom mapping for token fields in API responses. |
+| `parseLogin` | `Function` | Custom parser for login response: `(body: any) => TokenBundle`. |
+| `parseRefresh`| `Function` | Custom parser for refresh response: `(body: any) => TokenBundle`. |
+| `onLogin` | `Function` | Callback after login: `(bundle, body, ctx) => void`. |
+| `injectToken` | `Function` | Custom token injection: `(token: string) => string` (default: Bearer). |
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
 

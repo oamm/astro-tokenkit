@@ -219,32 +219,9 @@ export interface ClientConfig {
 }
 
 /**
- * Protection rule for routes
- */
-export interface ProtectionRule {
-    pattern: string;
-    redirectTo?: string;
-    role?: string;
-    roles?: string[];
-    permissions?: string[];
-}
-
-/**
- * Access hooks for authorization
- */
-export interface AccessHooks {
-    getRole?: (session: Session | null) => string | null | Promise<string | null>;
-    getPermissions?: (session: Session | null) => string[] | Promise<string[]>;
-    check?: (session: Session | null, ctx: TokenKitContext) => boolean | Promise<boolean>;
-}
-
-/**
  * TokenKit Global Configuration
  */
 export interface TokenKitConfig extends Partial<ClientConfig> {
-    loginPath?: string;
-    protect?: ProtectionRule[];
-    access?: AccessHooks;
 }
 
 /**

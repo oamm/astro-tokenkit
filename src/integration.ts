@@ -22,13 +22,7 @@ import { setConfig } from './config';
  *       auth: {
  *         login: '/auth/login',
  *         refresh: '/auth/refresh',
- *       },
- *       loginPath: '/login',
- *       protect: [
- *         { pattern: '/admin', role: 'admin' },
- *         { pattern: '/dashboard', roles: ['user', 'admin'] },
- *         { pattern: '/settings', permissions: ['settings:write'] }
- *       ]
+ *       }
  *     })
  *   ]
  * });
