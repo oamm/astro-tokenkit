@@ -25,14 +25,8 @@ pnpm add astro-tokenkit
 // src/lib/api.ts
 import { createClient } from 'astro-tokenkit';
 
-export const api = createClient({
-  baseURL: 'https://api.yourserver.com',
-  auth: {
-    login: '/auth/login',
-    refresh: '/auth/refresh',
-    logout: '/auth/logout',
-  }
-});
+// Uses global configuration from the integration by default
+export const api = createClient();
 ```
 
 ### 2. Add the Integration
@@ -41,10 +35,24 @@ export const api = createClient({
 // astro.config.mjs
 import { defineConfig } from 'astro/config';
 import { tokenKit } from 'astro-tokenkit';
-import { api } from './src/lib/api';
 
 export default defineConfig({
-  integrations: [tokenKit(api)],
+  integrations: [
+    tokenKit({
+      baseURL: 'https://api.yourserver.com',
+      auth: {
+        login: '/auth/login',
+        refresh: '/auth/refresh',
+        logout: '/auth/logout',
+      },
+      protect: [
+        { pattern: '/admin', role: 'admin' },
+        { pattern: '/dashboard', roles: ['user', 'admin'] },
+        { pattern: '/settings', permissions: ['settings:write'] }
+      ],
+      loginPath: '/login'
+    })
+  ],
 });
 ```
 
@@ -53,9 +61,9 @@ export default defineConfig({
 ```typescript
 // src/middleware.ts
 import { defineMiddleware } from 'astro-tokenkit';
-import { api } from './lib/api';
 
-export const onRequest = defineMiddleware(api);
+// Automatically handles context binding and token rotation using global config
+export const onRequest = defineMiddleware();
 ```
 
 ### 4. Use in Pages
@@ -72,6 +80,59 @@ const user = await api.get('/me');
 <h1>Welcome, {user.name}</h1>
 ```
 
+### Global Configuration
+
+TokenKit supports a global configuration via the `tokenKit` integration or `setConfig`. All `ClientConfig` properties can be set globally.
+
+```typescript
+import { setConfig } from 'astro-tokenkit';
+
+setConfig({
+  baseURL: 'https://api.example.com',
+  auth: {
+    login: '/auth/login',
+    refresh: '/auth/refresh',
+  },
+  loginPath: '/login',
+  protect: [
+    { pattern: '/admin' },
+    { pattern: '/profile', redirectTo: '/auth/signin' }
+  ],
+  access: {
+    check: (session) => session?.payload?.role === 'admin'
+  }
+});
+```
+
+### Route Protection
+
+You can define protection rules in your configuration. The middleware will automatically check these rules and redirect unauthenticated or unauthorized users.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `pattern` | `string` | URL pattern to match (starts with). |
+| `redirectTo`| `string` | Optional custom redirect path. |
+| `role` | `string` | Required role for this pattern. |
+| `roles` | `string[]` | List of allowed roles (any one will grant access). |
+| `permissions`| `string[]` | List of required permissions (all are required). |
+
+### Access Control
+
+Use the `access` hooks to implement fine-grained authorization logic.
+
+```typescript
+setConfig({
+  access: {
+    getRole: (session) => session?.payload?.role ?? null,
+    getPermissions: (session) => session?.payload?.permissions ?? [],
+    check: async (session, ctx) => {
+      // Custom async check
+      return true;
+    }
+  }
+});
+```
+
 ## Configuration
 
 ### Client Configuration
@@ -86,6 +147,7 @@ const user = await api.get('/me');
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
 | `context` | `AsyncLocalStorage` | External AsyncLocalStorage instance. |
 | `getContextStore`| `() => TokenKitContext`| Custom method to retrieve the context store. |
+| `runWithContext`| `Function`| Custom runner to bind context. |
 
 ### Auth Configuration
 

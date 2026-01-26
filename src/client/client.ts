@@ -1,30 +1,78 @@
 // packages/astro-tokenkit/src/client/client.ts
 
-import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext,} from '../types';
+import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext, TokenKitConfig, AuthConfig} from '../types';
 import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
 import {TokenManager} from '../auth/manager';
-import {type ContextOptions, getContext} from './context';
+import {getContextStore} from './context';
 import {calculateDelay, shouldRetry, sleep} from '../utils/retry';
+import {getConfig, getTokenManager} from '../config';
+import {createMiddleware} from '../middleware';
 
 /**
  * API Client
  */
 export class APIClient {
-    public tokenManager?: TokenManager;
-    private config: ClientConfig;
-    public contextOptions: ContextOptions;
+    private customConfig?: Partial<TokenKitConfig>;
+    private _localTokenManager?: TokenManager;
+    private _lastUsedAuth?: AuthConfig;
+    private _lastUsedBaseURL?: string;
 
-    constructor(config: ClientConfig) {
-        this.config = config;
-        this.contextOptions = {
-            context: config.context,
-            getContextStore: config.getContextStore,
-        };
+    constructor(config?: Partial<TokenKitConfig>) {
+        this.customConfig = config;
+    }
 
-        // Initialize token manager if auth is configured
-        if (config.auth) {
-            this.tokenManager = new TokenManager(config.auth, config.baseURL);
+    /**
+     * Get current configuration (merged with global)
+     */
+    public get config(): ClientConfig {
+        // Merge global config with custom config
+        const globalConfig = getConfig();
+        
+        // If no custom config, return global config directly
+        if (!this.customConfig) return globalConfig as ClientConfig;
+        
+        // Merge custom config on top of global config
+        return {
+            ...globalConfig,
+            ...this.customConfig,
+        } as ClientConfig;
+    }
+
+    /**
+     * Get token manager
+     */
+    public get tokenManager(): TokenManager | undefined {
+        const config = this.config;
+        if (!config.auth) return undefined;
+
+        const globalConfig = getConfig();
+        const globalManager = getTokenManager();
+
+        // Reuse global manager if it matches our configuration
+        if (globalManager && 
+            config.auth === globalConfig.auth && 
+            config.baseURL === globalConfig.baseURL) {
+            return globalManager;
         }
+
+        // Otherwise create/reuse a local manager for this client
+        if (!this._localTokenManager || 
+            this._lastUsedAuth !== config.auth || 
+            this._lastUsedBaseURL !== config.baseURL) {
+            this._localTokenManager = new TokenManager(config.auth, config.baseURL);
+            this._lastUsedAuth = config.auth;
+            this._lastUsedBaseURL = config.baseURL;
+        }
+
+        return this._localTokenManager;
+    }
+
+    /**
+     * Get middleware for context binding and automatic token rotation.
+     * This middleware uses the global configuration.
+     */
+    public middleware() {
+        return createMiddleware();
     }
 
     /**
@@ -89,7 +137,7 @@ export class APIClient {
      * Generic request method
      */
     async request<T = any>(config: RequestConfig): Promise<T> {
-        const ctx = getContext(config.ctx, this.contextOptions);
+        const ctx = getContextStore(config.ctx);
         let attempt = 0;
         let lastError: Error | undefined;
 
@@ -305,7 +353,7 @@ export class APIClient {
             throw new Error('Auth is not configured for this client');
         }
 
-        const context = getContext(ctx, this.contextOptions);
+        const context = getContextStore(ctx);
         await this.tokenManager.login(context, credentials);
     }
 
@@ -317,7 +365,7 @@ export class APIClient {
             throw new Error('Auth is not configured for this client');
         }
 
-        const context = getContext(ctx, this.contextOptions);
+        const context = getContextStore(ctx);
         await this.tokenManager.logout(context);
     }
 
@@ -327,7 +375,7 @@ export class APIClient {
     isAuthenticated(ctx?: TokenKitContext): boolean {
         if (!this.tokenManager) return false;
 
-        const context = getContext(ctx, this.contextOptions);
+        const context = getContextStore(ctx);
         return this.tokenManager.isAuthenticated(context);
     }
 
@@ -337,15 +385,26 @@ export class APIClient {
     getSession(ctx?: TokenKitContext): Session | null {
         if (!this.tokenManager) return null;
 
-        const context = getContext(ctx, this.contextOptions);
+        const context = getContextStore(ctx);
         return this.tokenManager.getSession(context);
     }
 
 }
 
 /**
- * Create API client
+ * Global API client instance.
+ * 
+ * This client is automatically synchronized with the global configuration 
+ * set via the Astro integration or setConfig().
  */
-export function createClient(config: ClientConfig): APIClient {
+export const api = new APIClient();
+
+/**
+ * Create API client.
+ * 
+ * If no configuration is provided, it returns the global `api` singleton.
+ */
+export function createClient(config?: Partial<TokenKitConfig>): APIClient {
+    if (!config) return api;
     return new APIClient(config);
 }

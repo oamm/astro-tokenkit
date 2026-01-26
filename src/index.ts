@@ -1,13 +1,16 @@
 // packages/astro-tokenkit/src/index.ts
 
 // Main client
-export { createClient, APIClient } from './client/client';
+export { createClient, APIClient, api } from './client/client';
 
 // Integration
 export { tokenKit, defineMiddleware } from './integration';
 
 // Middleware
 export { createMiddleware } from './middleware';
+
+// Configuration
+export { setConfig, getConfig, setTokenManager, getTokenManager } from './config';
 
 // Types
 export type {
@@ -25,7 +28,10 @@ export type {
     RequestInterceptor,
     ResponseInterceptor,
     ErrorInterceptor,
-    TokenKitContext
+    TokenKitContext,
+    TokenKitConfig,
+    ProtectionRule,
+    AccessHooks,
 } from './types';
 
 // Errors

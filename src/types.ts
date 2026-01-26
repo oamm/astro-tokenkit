@@ -22,6 +22,7 @@ export interface TokenKitContext {
     [key: string]: any;
 }
 
+
 /**
  * Session information
  */
@@ -206,12 +207,44 @@ export interface ClientConfig {
 
     /** Interceptors */
     interceptors?: InterceptorsConfig;
-
-    /** External AsyncLocalStorage instance (optional) */
+    
+    /** AsyncLocalStorage instance */
     context?: AsyncLocalStorage<any>;
-
-    /** Method to get the context store (optional) */
+    
+    /** Custom context store getter */
     getContextStore?: () => TokenKitContext | undefined | null;
+    
+    /** Custom context runner */
+    runWithContext?: <T>(ctx: TokenKitContext, fn: () => T) => T;
+}
+
+/**
+ * Protection rule for routes
+ */
+export interface ProtectionRule {
+    pattern: string;
+    redirectTo?: string;
+    role?: string;
+    roles?: string[];
+    permissions?: string[];
+}
+
+/**
+ * Access hooks for authorization
+ */
+export interface AccessHooks {
+    getRole?: (session: Session | null) => string | null | Promise<string | null>;
+    getPermissions?: (session: Session | null) => string[] | Promise<string[]>;
+    check?: (session: Session | null, ctx: TokenKitContext) => boolean | Promise<boolean>;
+}
+
+/**
+ * TokenKit Global Configuration
+ */
+export interface TokenKitConfig extends Partial<ClientConfig> {
+    loginPath?: string;
+    protect?: ProtectionRule[];
+    access?: AccessHooks;
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import type { TokenKitContext } from '../types';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { getConfig } from '../config';
 
 /**
  * OPTION: Share AsyncLocalStorage with other libraries
@@ -42,9 +43,17 @@ export function setSharedContextStorage(
 /**
  * Get context from shared storage
  */
-export function getContext(explicitCtx?: TokenKitContext): TokenKitContext {
+export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext {
     if (explicitCtx) {
         return explicitCtx;
+    }
+
+    const config = getConfig();
+    const getStore = config.getContextStore;
+
+    if (getStore) {
+        const ctx = getStore();
+        if (ctx) return ctx;
     }
 
     if (sharedStorage && contextKey) {
@@ -57,15 +66,23 @@ export function getContext(explicitCtx?: TokenKitContext): TokenKitContext {
 
     throw new Error(
         'Astro context not found. Either:\n' +
-        '1. Pass context explicitly: api.get("/path", { ctx: Astro })\n' +
-        '2. Configure shared storage: setSharedContextStorage(storage, "key")'
+        '1. Use api.middleware() to bind context automatically, or\n' +
+        '2. Pass context explicitly: api.get("/path", { ctx: Astro })\n' +
+        '3. Configure shared storage: setSharedContextStorage(storage, "key")'
     );
 }
 
 /**
  * Bind context (only needed if not using shared storage)
  */
-export function bindContext<T>(ctx: TokenKitContext, fn: () => T): T {
+export function runWithContext<T>(ctx: TokenKitContext, fn: () => T): T {
+    const config = getConfig();
+    const runner = config.runWithContext;
+
+    if (runner) {
+        return runner(ctx, fn);
+    }
+    
     if (sharedStorage && contextKey) {
         const currentStore = sharedStorage.getStore() || {};
         return sharedStorage.run({ ...currentStore, [contextKey]: ctx }, fn);

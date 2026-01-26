@@ -2,35 +2,38 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { TokenKitContext } from '../types';
+import { getConfig } from '../config';
 
 /**
  * Async local storage for Astro context
  */
-const defaultContextStorage = new AsyncLocalStorage<TokenKitContext>();
-
-/**
- * Configuration for context handling
- */
-export interface ContextOptions {
-    context?: AsyncLocalStorage<any>;
-    getContextStore?: () => TokenKitContext | undefined | null;
-}
+const als = new AsyncLocalStorage<TokenKitContext>();
 
 /**
  * Bind Astro context for the current async scope
  */
-export function bindContext<T>(ctx: TokenKitContext, fn: () => T, options?: ContextOptions): T {
-    const storage = options?.context || defaultContextStorage;
-    return storage.run(ctx, fn);
+export function runWithContext<T>(ctx: TokenKitContext, fn: () => T): T {
+    const config = getConfig();
+    const runner = config.runWithContext;
+
+    if (runner) {
+        return runner(ctx, fn);
+    }
+
+    return als.run(ctx, fn);
 }
 
 /**
  * Get current Astro context (from middleware binding or explicit)
  */
-export function getContext(explicitCtx?: TokenKitContext, options?: ContextOptions): TokenKitContext {
-    const store = options?.getContextStore 
-        ? options.getContextStore() 
-        : (options?.context || defaultContextStorage).getStore();
+export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext {
+    const config = getConfig();
+    const getStore = config.getContextStore;
+    const context = (config as any).context || als;
+
+    const store = getStore 
+        ? getStore() 
+        : (context as AsyncLocalStorage<TokenKitContext>).getStore();
     
     const ctx = explicitCtx || store;
 
@@ -48,10 +51,14 @@ export function getContext(explicitCtx?: TokenKitContext, options?: ContextOptio
 /**
  * Check if context is available
  */
-export function hasContext(explicitCtx?: TokenKitContext, options?: ContextOptions): boolean {
-    const store = options?.getContextStore 
-        ? options.getContextStore() 
-        : (options?.context || defaultContextStorage).getStore();
+export function hasContext(explicitCtx?: TokenKitContext): boolean {
+    const config = getConfig();
+    const getStore = config.getContextStore;
+    const context = (config as any).context || als;
+
+    const store = getStore 
+        ? getStore() 
+        : (context as AsyncLocalStorage<TokenKitContext>).getStore();
 
     return !!(explicitCtx || store);
 }

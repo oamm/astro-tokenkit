@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createClient, defineMiddleware } from '../src';
+import { createClient, defineMiddleware, setConfig } from '../src';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { APIContext } from 'astro';
 
-describe('APIClient with context options', () => {
+describe('APIClient with global config', () => {
     const mockAstro = {
         cookies: {
             get: vi.fn(),
@@ -15,11 +15,19 @@ describe('APIClient with context options', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // Reset global config
+        setConfig({
+            baseURL: '',
+            auth: undefined,
+            getContextStore: undefined,
+            runWithContext: undefined,
+            context: undefined,
+        });
     });
 
-    it('should use context options in login', async () => {
+    it('should use global config in login', async () => {
         const getContextStore = vi.fn(() => mockAstro);
-        const client = createClient({
+        setConfig({
             baseURL: 'https://api.example.com',
             auth: {
                 login: '/login',
@@ -28,6 +36,8 @@ describe('APIClient with context options', () => {
             },
             getContextStore,
         });
+
+        const client = createClient();
 
         // Mock fetch for login
         global.fetch = vi.fn().mockResolvedValue({
@@ -40,12 +50,14 @@ describe('APIClient with context options', () => {
         expect(mockAstro.cookies.set).toHaveBeenCalled();
     });
 
-    it('should use external context in request', async () => {
+    it('should use external context from global config in request', async () => {
         const externalStorage = new AsyncLocalStorage<any>();
-        const client = createClient({
+        setConfig({
             baseURL: 'https://api.example.com',
             context: externalStorage,
         });
+
+        const client = createClient();
 
         global.fetch = vi.fn().mockResolvedValue({
             ok: true,
@@ -61,8 +73,8 @@ describe('APIClient with context options', () => {
         });
     });
 
-    it('should use middleware to bind context and rotate tokens', async () => {
-        const client = createClient({
+    it('should use middleware to bind context and rotate tokens via global config', async () => {
+        setConfig({
             baseURL: 'https://api.example.com',
             auth: {
                 login: '/login',
@@ -86,7 +98,7 @@ describe('APIClient with context options', () => {
         });
 
         const next = vi.fn().mockResolvedValue('next-result');
-        const middleware = defineMiddleware(client);
+        const middleware = defineMiddleware();
 
         const result = await middleware(mockAstro, next);
 
@@ -97,19 +109,51 @@ describe('APIClient with context options', () => {
         expect(mockAstro.cookies.set).toHaveBeenCalledWith('access_token', 'new-access', expect.anything());
     });
 
-    it('should skip bindContext in middleware if getContextStore is defined', async () => {
+    it('should skip runWithContext in middleware if getContextStore is defined globally', async () => {
         const getContextStore = vi.fn(() => mockAstro);
-        const client = createClient({
+        setConfig({
             baseURL: 'https://api.example.com',
             getContextStore,
         });
 
-        const next = vi.fn().mockResolvedValue('next-result');
-        const middleware = defineMiddleware(client);
+        const client = createClient();
+
+        // Mock fetch for the internal request
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'ok' }),
+        });
+
+        const next = vi.fn().mockImplementation(async () => {
+            await client.get('/test');
+            return 'next-result';
+        });
+        const middleware = defineMiddleware();
 
         const result = await middleware(mockAstro, next);
 
         expect(result).toBe('next-result');
         expect(next).toHaveBeenCalled();
+        expect(getContextStore).toHaveBeenCalled();
+    });
+
+    it('should NOT skip runWithContext in middleware if both getContextStore and runWithContext are defined globally', async () => {
+        const getContextStore = vi.fn(() => mockAstro);
+        const runWithContext = vi.fn((ctx, fn) => fn());
+        setConfig({
+            baseURL: 'https://api.example.com',
+            getContextStore,
+            runWithContext,
+        });
+
+        const next = vi.fn().mockResolvedValue('next-result');
+        const middleware = defineMiddleware();
+
+        const result = await middleware(mockAstro, next);
+
+        expect(result).toBe('next-result');
+        expect(next).toHaveBeenCalled();
+        expect(runWithContext).toHaveBeenCalled();
     });
 });
