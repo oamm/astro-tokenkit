@@ -82,6 +82,21 @@ export interface FieldMapping {
 }
 
 /**
+ * Callback after successful login
+ */
+export type OnLoginCallback = (bundle: TokenBundle, body: any, ctx: TokenKitContext) => void | Promise<void>;
+
+/**
+ * Login options
+ */
+export interface LoginOptions {
+    /** Astro context (optional if middleware binds it) */
+    ctx?: TokenKitContext;
+    /** Callback after successful login */
+    onLogin?: OnLoginCallback;
+}
+
+/**
  * Auth configuration
  */
 export interface AuthConfig {
@@ -99,9 +114,6 @@ export interface AuthConfig {
     parseLogin?: (body: any) => TokenBundle;
     /** Custom refresh response parser */
     parseRefresh?: (body: any) => TokenBundle;
-
-    /** Callback after successful login */
-    onLogin?: (bundle: TokenBundle, body: any, ctx: TokenKitContext) => void | Promise<void>;
 
     /** Custom token injection function (default: Bearer) */
     injectToken?: (token: string) => string;

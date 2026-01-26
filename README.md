@@ -128,10 +128,16 @@ const specializedClient = createClient({
 | `fields` | `FieldMapping` | Custom mapping for token fields in API responses. |
 | `parseLogin` | `Function` | Custom parser for login response: `(body: any) => TokenBundle`. |
 | `parseRefresh`| `Function` | Custom parser for refresh response: `(body: any) => TokenBundle`. |
-| `onLogin` | `Function` | Callback after login: `(bundle, body, ctx) => void`. |
 | `injectToken` | `Function` | Custom token injection: `(token: string) => string` (default: Bearer). |
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
+
+### Login Options
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `ctx` | `TokenKitContext` | Optional Astro context. |
+| `onLogin` | `Function` | Callback after successful login: `(bundle, body, ctx) => void`. |
 
 ## Advanced Usage
 
@@ -163,7 +169,12 @@ const api = createClient({
 
 ```typescript
 // In an API route or server-side component
-await api.login({ username, password });
+await api.login({ username, password }, {
+  onLogin: (bundle, body, ctx) => {
+    // Post-login logic (e.g., sync session to another store)
+    console.log('User logged in!', bundle.sessionPayload);
+  }
+});
 
 await api.logout();
 ```

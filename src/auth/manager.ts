@@ -1,7 +1,7 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
 import { AuthError } from '../types';
-import type { TokenBundle, Session, AuthConfig, TokenKitContext } from '../types';
+import type { TokenBundle, Session, AuthConfig, TokenKitContext, OnLoginCallback } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
@@ -53,7 +53,7 @@ export class TokenManager {
     /**
      * Perform login
      */
-    async login(ctx: TokenKitContext, credentials: any): Promise<TokenBundle> {
+    async login(ctx: TokenKitContext, credentials: any, onLogin?: OnLoginCallback): Promise<TokenBundle> {
         const url = this.baseURL + this.config.login;
 
         const response = await fetch(url, {
@@ -84,8 +84,8 @@ export class TokenManager {
         storeTokens(ctx, bundle, this.config.cookies);
 
         // Call onLogin callback if provided
-        if (this.config.onLogin) {
-            await this.config.onLogin(bundle, body, ctx);
+        if (onLogin) {
+            await onLogin(bundle, body, ctx);
         }
 
         return bundle;

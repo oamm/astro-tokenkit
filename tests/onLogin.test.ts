@@ -23,7 +23,6 @@ describe('APIClient onLogin callback', () => {
             auth: {
                 login: '/login',
                 refresh: '/refresh',
-                onLogin,
             },
         });
 
@@ -38,7 +37,10 @@ describe('APIClient onLogin callback', () => {
             }),
         });
 
-        await client.login({ username: 'test' }, { cookies: mockAstro.cookies });
+        await client.login({ username: 'test' }, { 
+            ctx: { cookies: mockAstro.cookies } as any, 
+            onLogin 
+        });
 
         expect(onLogin).toHaveBeenCalled();
         const [bundle, body, ctx] = onLogin.mock.calls[0];
@@ -63,7 +65,6 @@ describe('APIClient onLogin callback', () => {
             auth: {
                 login: '/login',
                 refresh: '/refresh',
-                onLogin,
             },
         });
 
@@ -76,7 +77,10 @@ describe('APIClient onLogin callback', () => {
             }),
         });
 
-        await client.login({ username: 'test' }, { cookies: mockAstro.cookies });
+        await client.login({ username: 'test' }, { 
+            ctx: { cookies: mockAstro.cookies } as any, 
+            onLogin 
+        });
 
         expect(onLogin).toHaveBeenCalled();
         expect(callbackFinished).toBe(true);
