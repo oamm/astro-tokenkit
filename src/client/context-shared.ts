@@ -43,11 +43,7 @@ export function setSharedContextStorage(
 /**
  * Get context from shared storage
  */
-export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext {
-    if (explicitCtx) {
-        return explicitCtx;
-    }
-
+export function getContextStore(): TokenKitContext {
     const config = getConfig();
     const getStore = config.getContextStore;
 
@@ -65,10 +61,7 @@ export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext 
     }
 
     throw new Error(
-        'Astro context not found. Either:\n' +
-        '1. Use api.middleware() to bind context automatically, or\n' +
-        '2. Pass context explicitly: api.get("/path", { ctx: Astro })\n' +
-        '3. Configure shared storage: setSharedContextStorage(storage, "key")'
+        'Astro context not found. Make sure to use api.middleware() to bind context automatically.'
     );
 }
 

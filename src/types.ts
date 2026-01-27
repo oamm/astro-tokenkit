@@ -36,8 +36,6 @@ export interface Session {
  * Request options
  */
 export interface RequestOptions {
-    /** Astro context (optional if middleware binds it) */
-    ctx?: TokenKitContext;
     /** Additional headers */
     headers?: Record<string, string>;
     /** Request timeout in ms */
@@ -48,6 +46,8 @@ export interface RequestOptions {
     skipAuth?: boolean;
     /** Custom signal for cancellation */
     signal?: AbortSignal;
+    /** Auth override options for automatic refresh if triggered */
+    auth?: AuthOptions;
 }
 
 /**
@@ -87,11 +87,19 @@ export interface FieldMapping {
 export type OnLoginCallback = (bundle: TokenBundle, body: any, ctx: TokenKitContext) => void | Promise<void>;
 
 /**
+ * Auth override options
+ */
+export interface AuthOptions {
+    /** Extra data for this specific auth request (login/refresh) */
+    data?: Record<string, any>;
+}
+
+/**
  * Login options
  */
-export interface LoginOptions {
-    /** Astro context (optional if middleware binds it) */
-    ctx?: TokenKitContext;
+export interface LoginOptions extends AuthOptions {
+    /** Extra headers for this specific login request */
+    headers?: Record<string, string>;
     /** Callback after successful login */
     onLogin?: OnLoginCallback;
 }
@@ -106,6 +114,21 @@ export interface AuthConfig {
     refresh: string;
     /** Logout endpoint (optional, relative to baseURL) */
     logout?: string;
+
+    /** Content type for auth requests (default: 'application/json') */
+    contentType?: 'application/json' | 'application/x-www-form-urlencoded';
+
+    /** Extra headers for login/refresh requests */
+    headers?: Record<string, string>;
+
+    /** Extra data for login request */
+    loginData?: Record<string, any>;
+
+    /** Extra data for refresh request */
+    refreshData?: Record<string, any>;
+
+    /** Field name for refresh token in refresh request (default: 'refreshToken') */
+    refreshRequestField?: string;
 
     /** Field mapping (auto-detected if not provided) */
     fields?: FieldMapping;

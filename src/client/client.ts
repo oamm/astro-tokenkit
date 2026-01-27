@@ -1,6 +1,7 @@
 // packages/astro-tokenkit/src/client/client.ts
 
-import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext, TokenKitConfig, AuthConfig, LoginOptions, OnLoginCallback} from '../types';
+import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext, TokenKitConfig,
+    AuthConfig, LoginOptions} from '../types';
 import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
 import {TokenManager} from '../auth/manager';
 import {getContextStore} from './context';
@@ -137,7 +138,7 @@ export class APIClient {
      * Generic request method
      */
     async request<T = any>(config: RequestConfig): Promise<T> {
-        const ctx = getContextStore(config.ctx);
+        const ctx = getContextStore();
         let attempt = 0;
         let lastError: Error | undefined;
 
@@ -173,7 +174,7 @@ export class APIClient {
     ): Promise<APIResponse<T>> {
         // Ensure valid session (if auth is enabled)
         if (this.tokenManager && !config.skipAuth) {
-            await this.tokenManager.ensure(ctx);
+            await this.tokenManager.ensure(ctx, config.auth, config.headers);
         }
 
         // Build full URL
@@ -218,7 +219,7 @@ export class APIClient {
             // Handle 401 (try refresh and retry once)
             if (response.status === 401 && this.tokenManager && !config.skipAuth && attempt === 1) {
                 // Clear and try fresh session
-                const session = await this.tokenManager.ensure(ctx);
+                const session = await this.tokenManager.ensure(ctx, config.auth, config.headers);
                 if (session) {
                     // Retry with new token
                     return this.executeRequest<T>(config, ctx, attempt + 1);
@@ -348,55 +349,44 @@ export class APIClient {
     /**
      * Login
      */
-    async login(credentials: any, options?: LoginOptions | TokenKitContext): Promise<void> {
+    async login(credentials: any, options?: LoginOptions): Promise<void> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }
 
-        let ctx: TokenKitContext | undefined;
-        let onLogin: OnLoginCallback | undefined;
-
-        if (options && 'cookies' in options) {
-            ctx = options as TokenKitContext;
-        } else if (options) {
-            const opt = options as LoginOptions;
-            ctx = opt.ctx;
-            onLogin = opt.onLogin;
-        }
-
-        const context = getContextStore(ctx);
-        await this.tokenManager.login(context, credentials, onLogin);
+        const context = getContextStore();
+        await this.tokenManager.login(context, credentials, options);
     }
 
     /**
      * Logout
      */
-    async logout(ctx?: TokenKitContext): Promise<void> {
+    async logout(): Promise<void> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }
 
-        const context = getContextStore(ctx);
+        const context = getContextStore();
         await this.tokenManager.logout(context);
     }
 
     /**
      * Check if authenticated
      */
-    isAuthenticated(ctx?: TokenKitContext): boolean {
+    isAuthenticated(): boolean {
         if (!this.tokenManager) return false;
 
-        const context = getContextStore(ctx);
+        const context = getContextStore();
         return this.tokenManager.isAuthenticated(context);
     }
 
     /**
      * Get current session
      */
-    getSession(ctx?: TokenKitContext): Session | null {
+    getSession(): Session | null {
         if (!this.tokenManager) return null;
 
-        const context = getContextStore(ctx);
+        const context = getContextStore();
         return this.tokenManager.getSession(context);
     }
 

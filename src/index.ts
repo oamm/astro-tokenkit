@@ -41,4 +41,5 @@ export {
 } from './types';
 
 // Utilities (for advanced users)
+export { runWithContext, getContextStore } from './client/context';
 export { parseTime, formatTime } from './utils/time';

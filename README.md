@@ -125,6 +125,11 @@ const specializedClient = createClient({
 | `login` | `string` | Endpoint path for login (POST). |
 | `refresh` | `string` | Endpoint path for token refresh (POST). |
 | `logout` | `string` | Endpoint path for logout (POST). |
+| `contentType` | `'application/json' \| 'application/x-www-form-urlencoded'` | Content type for auth requests (default: `application/json`). |
+| `headers` | `Record<string, string>` | Extra headers for login/refresh requests. |
+| `loginData` | `Record<string, any>` | Extra data to be sent with login request. |
+| `refreshData` | `Record<string, any>` | Extra data to be sent with refresh request. |
+| `refreshRequestField` | `string` | Field name for the refresh token in the refresh request (default: `refreshToken`). |
 | `fields` | `FieldMapping` | Custom mapping for token fields in API responses. |
 | `parseLogin` | `Function` | Custom parser for login response: `(body: any) => TokenBundle`. |
 | `parseRefresh`| `Function` | Custom parser for refresh response: `(body: any) => TokenBundle`. |
@@ -136,17 +141,33 @@ const specializedClient = createClient({
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| `ctx` | `TokenKitContext` | Optional Astro context. |
 | `onLogin` | `Function` | Callback after successful login: `(bundle, body, ctx) => void`. |
+| `headers` | `Record<string, string>` | Extra headers for this specific login request. |
+| `data` | `Record<string, any>` | Extra data for this specific login request. |
+
+### Request Auth Overrides
+
+When calling `api.get()`, `api.post()`, etc., you can override auth configuration (e.g., for multi-tenancy). Headers provided in the request options are automatically propagated to any automatic token refresh operations:
+
+```typescript
+await api.get('/data', {
+  headers: { 'x-tenant-name': 'lynx' },
+  auth: {
+    data: { extra_refresh_param: 'value' }
+  }
+});
+```
 
 ## Advanced Usage
 
 ### Manual Context
 
-If you prefer not to use middleware, you can pass the Astro context explicitly to any request:
+If you prefer not to use middleware, you can bind the Astro context manually for a specific scope:
 
 ```typescript
-const data = await api.get('/data', { ctx: Astro });
+import { runWithContext } from 'astro-tokenkit';
+
+const data = await runWithContext(Astro, () => api.get('/data'));
 ```
 
 ### Interceptors

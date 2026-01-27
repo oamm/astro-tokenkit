@@ -26,7 +26,7 @@ export function runWithContext<T>(ctx: TokenKitContext, fn: () => T): T {
 /**
  * Get current Astro context (from middleware binding or explicit)
  */
-export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext {
+export function getContextStore(): TokenKitContext {
     const config = getConfig();
     const getStore = config.getContextStore;
     const context = (config as any).context || als;
@@ -35,23 +35,19 @@ export function getContextStore(explicitCtx?: TokenKitContext): TokenKitContext 
         ? getStore() 
         : (context as AsyncLocalStorage<TokenKitContext>).getStore();
     
-    const ctx = explicitCtx || store;
-
-    if (!ctx) {
+    if (!store) {
         throw new Error(
-            'Astro context not found. Either:\n' +
-            '1. Use api.middleware() to bind context automatically, or\n' +
-            '2. Pass context explicitly: api.get("/path", { ctx: Astro })'
+            'Astro context not found. Make sure to use api.middleware() to bind context automatically.'
         );
     }
 
-    return ctx;
+    return store;
 }
 
 /**
  * Check if context is available
  */
-export function hasContext(explicitCtx?: TokenKitContext): boolean {
+export function hasContext(): boolean {
     const config = getConfig();
     const getStore = config.getContextStore;
     const context = (config as any).context || als;
@@ -60,5 +56,5 @@ export function hasContext(explicitCtx?: TokenKitContext): boolean {
         ? getStore() 
         : (context as AsyncLocalStorage<TokenKitContext>).getStore();
 
-    return !!(explicitCtx || store);
+    return !!store;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { getContextStore, runWithContext } from '../src/client/context';
+import { getContextStore, runWithContext } from '../src';
 import type { TokenKitContext } from '../src';
 import type { APIContext } from 'astro';
 import { setConfig } from '../src';
@@ -54,19 +54,6 @@ describe('context handling', () => {
         expect(customGetContextStore).toHaveBeenCalled();
     });
 
-    it('should prioritize explicit context', () => {
-        const explicitAstro = { id: 'explicit', cookies: new Map() } as unknown as TokenKitContext;
-        const storeAstro = { id: 'store', cookies: new Map() } as unknown as TokenKitContext;
-        const customGetContextStore = () => storeAstro;
-        const customSetContextStore = (_: any) => {};
-        setConfig({ 
-            getContextStore: customGetContextStore,
-            setContextStore: customSetContextStore
-        });
-
-        const ctx = getContextStore(explicitAstro);
-        expect(ctx).toBe(explicitAstro);
-    });
 
     it('should use runWithContext option', () => {
         const customRunWithContext = vi.fn((ctx, fn) => fn());

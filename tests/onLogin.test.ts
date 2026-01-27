@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createClient } from '../src';
+import { createClient, runWithContext } from '../src';
 import type { APIContext } from 'astro';
 
 describe('APIClient onLogin callback', () => {
@@ -37,10 +37,9 @@ describe('APIClient onLogin callback', () => {
             }),
         });
 
-        await client.login({ username: 'test' }, { 
-            ctx: { cookies: mockAstro.cookies } as any, 
-            onLogin 
-        });
+        await runWithContext({ cookies: mockAstro.cookies } as any, () => 
+            client.login({ username: 'test' }, { onLogin })
+        );
 
         expect(onLogin).toHaveBeenCalled();
         const [bundle, body, ctx] = onLogin.mock.calls[0];
@@ -77,10 +76,9 @@ describe('APIClient onLogin callback', () => {
             }),
         });
 
-        await client.login({ username: 'test' }, { 
-            ctx: { cookies: mockAstro.cookies } as any, 
-            onLogin 
-        });
+        await runWithContext({ cookies: mockAstro.cookies } as any, () => 
+            client.login({ username: 'test' }, { onLogin })
+        );
 
         expect(onLogin).toHaveBeenCalled();
         expect(callbackFinished).toBe(true);

@@ -1,7 +1,7 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
 import { AuthError } from '../types';
-import type { TokenBundle, Session, AuthConfig, TokenKitContext, OnLoginCallback } from '../types';
+import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
@@ -53,13 +53,33 @@ export class TokenManager {
     /**
      * Perform login
      */
-    async login(ctx: TokenKitContext, credentials: any, onLogin?: OnLoginCallback): Promise<TokenBundle> {
+    async login(ctx: TokenKitContext, credentials: any, options?: LoginOptions): Promise<TokenBundle> {
         const url = this.baseURL + this.config.login;
+
+        const contentType = this.config.contentType || 'application/json';
+        const headers: Record<string, string> = {
+            'Content-Type': contentType,
+            ...this.config.headers,
+            ...options?.headers,
+        };
+
+        const data = {
+            ...this.config.loginData,
+            ...options?.data,
+            ...credentials,
+        };
+
+        let requestBody: string;
+        if (contentType === 'application/x-www-form-urlencoded') {
+            requestBody = new URLSearchParams(data).toString();
+        } else {
+            requestBody = JSON.stringify(data);
+        }
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(credentials),
+            headers,
+            body: requestBody,
         }).catch(error => {
             throw new AuthError(`Login request failed: ${error.message}`);
         });
@@ -84,8 +104,8 @@ export class TokenManager {
         storeTokens(ctx, bundle, this.config.cookies);
 
         // Call onLogin callback if provided
-        if (onLogin) {
-            await onLogin(bundle, body, ctx);
+        if (options?.onLogin) {
+            await options.onLogin(bundle, body, ctx);
         }
 
         return bundle;
@@ -94,9 +114,9 @@ export class TokenManager {
     /**
      * Perform token refresh
      */
-    async refresh(ctx: TokenKitContext, refreshToken: string): Promise<TokenBundle | null> {
+    async refresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, headers?: Record<string, string>): Promise<TokenBundle | null> {
         try {
-            return await this.performRefresh(ctx, refreshToken);
+            return await this.performRefresh(ctx, refreshToken, options, headers);
         } catch (error) {
             clearTokens(ctx, this.config.cookies);
             throw error;
@@ -106,13 +126,34 @@ export class TokenManager {
     /**
      * Internal refresh implementation
      */
-    private async performRefresh(ctx: TokenKitContext, refreshToken: string): Promise<TokenBundle | null> {
+    private async performRefresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, extraHeaders?: Record<string, string>): Promise<TokenBundle | null> {
         const url = this.baseURL + this.config.refresh;
+
+        const contentType = this.config.contentType || 'application/json';
+        const headers: Record<string, string> = {
+            'Content-Type': contentType,
+            ...this.config.headers,
+            ...extraHeaders,
+        };
+
+        const refreshField = this.config.refreshRequestField || 'refreshToken';
+        const data = {
+            ...this.config.refreshData,
+            ...options?.data,
+            [refreshField]: refreshToken,
+        };
+
+        let requestBody: string;
+        if (contentType === 'application/x-www-form-urlencoded') {
+            requestBody = new URLSearchParams(data).toString();
+        } else {
+            requestBody = JSON.stringify(data);
+        }
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
+            headers,
+            body: requestBody,
         }).catch(error => {
             throw new AuthError(`Refresh request failed: ${error.message}`);
         });
@@ -152,7 +193,7 @@ export class TokenManager {
     /**
      * Ensure valid tokens (with automatic refresh)
      */
-    async ensure(ctx: TokenKitContext): Promise<Session | null> {
+    async ensure(ctx: TokenKitContext, options?: AuthOptions, headers?: Record<string, string>): Promise<Session | null> {
         const now = Math.floor(Date.now() / 1000);
         const tokens = retrieveTokens(ctx, this.config.cookies);
 
@@ -165,7 +206,7 @@ export class TokenManager {
         if (isExpired(tokens.expiresAt, now, this.config.policy)) {
             const flightKey = this.createFlightKey(tokens.refreshToken);
             const bundle = await this.singleFlight.execute(flightKey, () =>
-                this.refresh(ctx, tokens.refreshToken!)
+                this.refresh(ctx, tokens.refreshToken!, options, headers)
             );
 
             if (!bundle) return null;
@@ -181,7 +222,7 @@ export class TokenManager {
         if (shouldRefresh(tokens.expiresAt, now, tokens.lastRefreshAt, this.config.policy)) {
             const flightKey = this.createFlightKey(tokens.refreshToken);
             const bundle = await this.singleFlight.execute(flightKey, () =>
-                this.refresh(ctx, tokens.refreshToken!)
+                this.refresh(ctx, tokens.refreshToken!, options, headers)
             );
 
             if (bundle) {
