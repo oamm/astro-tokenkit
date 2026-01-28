@@ -30,6 +30,9 @@ export type {
     ErrorInterceptor,
     TokenKitContext,
     TokenKitConfig,
+    LoginOptions,
+    OnLoginCallback,
+    OnErrorCallback,
 } from './types';
 
 // Errors

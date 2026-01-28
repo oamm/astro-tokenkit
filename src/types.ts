@@ -90,6 +90,11 @@ export interface FieldMapping {
 export type OnLoginCallback = (bundle: TokenBundle, body: any, ctx: TokenKitContext) => void | Promise<void>;
 
 /**
+ * Callback after failed login
+ */
+export type OnErrorCallback = (error: AuthError, ctx: TokenKitContext) => void | Promise<void>;
+
+/**
  * Auth override options
  */
 export interface AuthOptions {
@@ -105,6 +110,8 @@ export interface LoginOptions extends AuthOptions {
     headers?: Record<string, string>;
     /** Callback after successful login */
     onLogin?: OnLoginCallback;
+    /** Callback after failed login */
+    onError?: OnErrorCallback;
 }
 
 /**

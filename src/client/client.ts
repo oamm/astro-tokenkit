@@ -1,7 +1,7 @@
 // packages/astro-tokenkit/src/client/client.ts
 
 import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext, TokenKitConfig,
-    AuthConfig, LoginOptions} from '../types';
+    AuthConfig, LoginOptions, TokenBundle} from '../types';
 import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
 import {TokenManager} from '../auth/manager';
 import {getContextStore} from './context';
@@ -349,13 +349,13 @@ export class APIClient {
     /**
      * Login
      */
-    async login(credentials: any, options?: LoginOptions): Promise<void> {
+    async login(credentials: any, options?: LoginOptions): Promise<TokenBundle> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }
 
         const context = getContextStore();
-        await this.tokenManager.login(context, credentials, options);
+        return this.tokenManager.login(context, credentials, options);
     }
 
     /**

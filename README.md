@@ -142,6 +142,7 @@ const specializedClient = createClient({
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `onLogin` | `Function` | Callback after successful login: `(bundle, body, ctx) => void`. |
+| `onError` | `Function` | Callback after failed login: `(error, ctx) => void`. |
 | `headers` | `Record<string, string>` | Extra headers for this specific login request. |
 | `data` | `Record<string, any>` | Extra data for this specific login request. |
 
@@ -194,7 +195,16 @@ await api.login({ username, password }, {
   onLogin: (bundle, body, ctx) => {
     // Post-login logic (e.g., sync session to another store)
     console.log('User logged in!', bundle.sessionPayload);
+  },
+  onError: (error, ctx) => {
+    // Handle error (e.g., log it or perform cleanup)
+    console.error('Login failed:', error.message);
   }
+});
+
+// login also returns a Promise, so you can use .catch()
+await api.login(credentials).catch(err => {
+  console.error('Caught error:', err.message);
 });
 
 await api.logout();
