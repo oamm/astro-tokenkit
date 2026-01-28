@@ -5,6 +5,8 @@ import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, Lo
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
+import { safeFetch } from '../utils/fetch';
+import { logger } from '../utils/logger';
 
 /**
  * Single-flight refresh manager
@@ -78,13 +80,13 @@ export class TokenManager {
 
         let response: Response;
         try {
-            response = await fetch(url, {
+            response = await safeFetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
-            });
+            }, this.config);
         } catch (error: any) {
-            const authError = new AuthError(`Login request failed: ${error.message}`);
+            const authError = new AuthError(`Login request failed: ${error.message}`, undefined, undefined, undefined, error);
             if (options?.onError) await options.onError(authError, ctx);
             throw authError;
         }
@@ -168,13 +170,13 @@ export class TokenManager {
 
         let response: Response;
         try {
-            response = await fetch(url, {
+            response = await safeFetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
-            });
+            }, this.config);
         } catch (error: any) {
-            throw new AuthError(`Refresh request failed: ${error.message}`);
+            throw new AuthError(`Refresh request failed: ${error.message}`, undefined, undefined, undefined, error);
         }
 
         if (!response.ok) {
@@ -286,10 +288,10 @@ export class TokenManager {
                     headers['Authorization'] = injectFn(session.accessToken, session.tokenType);
                 }
 
-                await fetch(url, { method: 'POST', headers });
+                await safeFetch(url, { method: 'POST', headers }, this.config);
             } catch (error) {
                 // Ignore logout endpoint errors
-                console.warn('[TokenKit] Logout endpoint failed:', error);
+                logger.debug('[TokenKit] Logout endpoint failed:', error);
             }
         }
 

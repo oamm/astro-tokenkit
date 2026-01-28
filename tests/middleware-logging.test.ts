@@ -14,11 +14,12 @@ describe('Middleware Logging', () => {
             getContextStore: undefined,
             setContextStore: undefined,
             runWithContext: undefined,
+            debug: true,
         });
     });
 
     it('should log default initialization', async () => {
-        const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const middleware = createMiddleware();
         const mockCtx = {
             cookies: new Map(),
@@ -33,7 +34,7 @@ describe('Middleware Logging', () => {
     });
 
     it('should log custom context store initialization', async () => {
-        const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         setConfig({
             auth: { login: '/l', refresh: '/r' },
             getContextStore: () => ({}) as any,
@@ -54,7 +55,7 @@ describe('Middleware Logging', () => {
     });
 
     it('should log custom runWithContext initialization', async () => {
-        const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         setConfig({
             runWithContext: (ctx, fn) => fn(),
         });
@@ -73,7 +74,7 @@ describe('Middleware Logging', () => {
     });
 
     it('should only log once', async () => {
-        const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
         const middleware = createMiddleware();
         const mockCtx = {
             cookies: new Map(),
@@ -85,6 +86,25 @@ describe('Middleware Logging', () => {
         await middleware(mockCtx, next);
 
         expect(spy).toHaveBeenCalledTimes(1);
+        spy.mockRestore();
+    });
+
+    it('should not log when debug is false', async () => {
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+        setConfig({
+            debug: false,
+        });
+
+        const middleware = createMiddleware();
+        const mockCtx = {
+            cookies: new Map(),
+            request: new Request('https://example.com'),
+        } as unknown as APIContext;
+        const next = vi.fn().mockResolvedValue(new Response());
+
+        await middleware(mockCtx, next);
+
+        expect(spy).not.toHaveBeenCalled();
         spy.mockRestore();
     });
 });

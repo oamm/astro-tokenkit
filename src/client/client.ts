@@ -8,6 +8,7 @@ import {getContextStore} from './context';
 import {calculateDelay, shouldRetry, sleep} from '../utils/retry';
 import {getConfig, getTokenManager} from '../config';
 import {createMiddleware} from '../middleware';
+import {safeFetch} from '../utils/fetch';
 
 /**
  * API Client
@@ -60,7 +61,15 @@ export class APIClient {
         if (!this._localTokenManager || 
             this._lastUsedAuth !== config.auth || 
             this._lastUsedBaseURL !== config.baseURL) {
-            this._localTokenManager = new TokenManager(config.auth, config.baseURL);
+            
+            // Merge client-level fetch and SSL settings into auth config
+            const authConfig: AuthConfig = {
+                ...config.auth,
+                fetch: config.auth.fetch ?? config.fetch,
+                dangerouslyIgnoreCertificateErrors: config.auth.dangerouslyIgnoreCertificateErrors ?? config.dangerouslyIgnoreCertificateErrors,
+            };
+            
+            this._localTokenManager = new TokenManager(authConfig, config.baseURL);
             this._lastUsedAuth = config.auth;
             this._lastUsedBaseURL = config.baseURL;
         }
@@ -205,10 +214,10 @@ export class APIClient {
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-            const response = await fetch(fullURL, {
+            const response = await safeFetch(fullURL, {
                 ...init,
                 signal: controller.signal,
-            });
+            }, this.config);
 
             clearTimeout(timeoutId);
 
@@ -247,14 +256,14 @@ export class APIClient {
 
             // Transform errors
             if (error instanceof Error && error.name === 'AbortError') {
-                throw new TimeoutError(`Request timeout after ${timeout}ms`, requestConfig);
+                throw new TimeoutError(`Request timeout after ${timeout}ms`, requestConfig, error);
             }
 
             if (error instanceof APIError) {
                 throw error;
             }
 
-            throw new NetworkError((error as Error).message, requestConfig);
+            throw new NetworkError((error as Error).message, requestConfig, error);
         }
     }
 

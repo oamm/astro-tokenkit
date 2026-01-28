@@ -157,6 +157,12 @@ export interface AuthConfig {
 
     /** Cookie configuration */
     cookies?: CookieConfig;
+
+    /** Custom fetch implementation */
+    fetch?: typeof fetch;
+
+    /** Dangerously ignore certificate errors (bypass SSL validation) */
+    dangerouslyIgnoreCertificateErrors?: boolean;
 }
 
 /**
@@ -265,6 +271,15 @@ export interface ClientConfig {
     
     /** Custom context runner */
     runWithContext?: <T>(ctx: TokenKitContext, fn: () => T) => T;
+
+    /** Custom fetch implementation */
+    fetch?: typeof fetch;
+
+    /** Enable debug logging */
+    debug?: boolean;
+
+    /** Dangerously ignore certificate errors (bypass SSL validation) */
+    dangerouslyIgnoreCertificateErrors?: boolean;
 }
 
 /**
@@ -286,10 +301,12 @@ export class APIError extends Error {
         message: string,
         public status?: number,
         public response?: any,
-        public request?: RequestConfig
+        public request?: RequestConfig,
+        public cause?: any
     ) {
         super(message);
         this.name = 'APIError';
+        if (cause && !this.cause) this.cause = cause;
     }
 }
 
@@ -297,8 +314,8 @@ export class APIError extends Error {
  * Authentication Error
  */
 export class AuthError extends APIError {
-    constructor(message: string, status?: number, response?: any, request?: RequestConfig) {
-        super(message, status, response, request);
+    constructor(message: string, status?: number, response?: any, request?: RequestConfig, cause?: any) {
+        super(message, status, response, request, cause);
         this.name = 'AuthError';
     }
 }
@@ -307,8 +324,8 @@ export class AuthError extends APIError {
  * Network Error
  */
 export class NetworkError extends APIError {
-    constructor(message: string, request?: RequestConfig) {
-        super(message, undefined, undefined, request);
+    constructor(message: string, request?: RequestConfig, cause?: any) {
+        super(message, undefined, undefined, request, cause);
         this.name = 'NetworkError';
     }
 }
@@ -317,8 +334,8 @@ export class NetworkError extends APIError {
  * Timeout Error
  */
 export class TimeoutError extends APIError {
-    constructor(message: string, request?: RequestConfig) {
-        super(message, undefined, undefined, request);
+    constructor(message: string, request?: RequestConfig, cause?: any) {
+        super(message, undefined, undefined, request, cause);
         this.name = 'TimeoutError';
     }
 }

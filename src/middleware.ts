@@ -3,6 +3,7 @@
 import type {MiddlewareHandler} from 'astro';
 import {runWithContext as defaultRunWithContext} from './client/context';
 import {getConfig, getTokenManager} from './config';
+import {logger} from './utils/logger';
 
 const LOGGED_KEY = Symbol.for('astro-tokenkit.middleware.logged');
 
@@ -27,7 +28,7 @@ export function createMiddleware(): MiddlewareHandler {
                 contextStrategy = 'custom (external AsyncLocalStorage)';
             }
 
-            console.log(`[TokenKit] Middleware initialized (auth: ${authStatus}, context: ${contextStrategy})`);
+            logger.debug(`[TokenKit] Middleware initialized (auth: ${authStatus}, context: ${contextStrategy})`);
             globalStorage[LOGGED_KEY] = true;
         }
 
@@ -39,7 +40,7 @@ export function createMiddleware(): MiddlewareHandler {
                     await tokenManager.ensure(ctx);
                 } catch (error: any) {
                     // Log only the message to avoid leaking sensitive data in the error object
-                    console.error('[TokenKit] Automatic token rotation failed:', error.message || error);
+                    logger.debug('[TokenKit] Automatic token rotation failed:', error.message || error);
                 }
             }
             return next();

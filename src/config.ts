@@ -22,6 +22,7 @@ if (!globalStorage[CONFIG_KEY]) {
         getContextStore: undefined,
         setContextStore: undefined,
         baseURL: "",
+        debug: false,
     };
 }
 
@@ -45,7 +46,12 @@ export function setConfig(userConfig: TokenKitConfig): void {
 
     // Re-initialize global token manager if auth changed
     if (finalConfig.auth) {
-        globalStorage[MANAGER_KEY] = new TokenManager(finalConfig.auth, finalConfig.baseURL);
+        const authConfig = {
+            ...finalConfig.auth,
+            fetch: finalConfig.auth.fetch ?? finalConfig.fetch,
+            dangerouslyIgnoreCertificateErrors: finalConfig.auth.dangerouslyIgnoreCertificateErrors ?? finalConfig.dangerouslyIgnoreCertificateErrors,
+        };
+        globalStorage[MANAGER_KEY] = new TokenManager(authConfig, finalConfig.baseURL);
     } else {
         globalStorage[MANAGER_KEY] = undefined;
     }

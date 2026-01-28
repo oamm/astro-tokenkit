@@ -1,6 +1,6 @@
 {
   "name": "astro-tokenkit",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "A powerful API client for Astro with automatic token rotation, session management, and seamless context integration.",
   "main": "dist/index.js",
   "module": "dist/index.js",

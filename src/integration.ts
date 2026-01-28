@@ -4,6 +4,7 @@ import type { AstroIntegration } from 'astro';
 import { createMiddleware } from './middleware';
 import type { TokenKitConfig } from './types';
 import { setConfig } from './config';
+import { logger } from './utils/logger';
 
 /**
  * Astro integration for TokenKit
@@ -57,7 +58,7 @@ export function tokenKit(config: TokenKitConfig): AstroIntegration {
                     });
                 }
 
-                console.log('[TokenKit] Integration initialized');
+                logger.debug('[TokenKit] Integration initialized');
             },
         },
     };
