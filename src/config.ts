@@ -3,6 +3,11 @@
 import type { TokenKitConfig } from "./types";
 import { TokenManager } from "./auth/manager";
 
+const CONFIG_KEY = Symbol.for('astro-tokenkit.config');
+const MANAGER_KEY = Symbol.for('astro-tokenkit.manager');
+
+const globalStorage = globalThis as any;
+
 /**
  * Internal config with defaults applied
  */
@@ -10,21 +15,23 @@ export interface ResolvedConfig extends TokenKitConfig {
     baseURL: string;
 }
 
-let config: ResolvedConfig = {
-    runWithContext: undefined,
-    getContextStore: undefined,
-    setContextStore: undefined,
-    baseURL: "",
-};
-
-let tokenManager: TokenManager | undefined;
+// Initialize global storage if not present
+if (!globalStorage[CONFIG_KEY]) {
+    globalStorage[CONFIG_KEY] = {
+        runWithContext: undefined,
+        getContextStore: undefined,
+        setContextStore: undefined,
+        baseURL: "",
+    };
+}
 
 /**
  * Set configuration
  */
 export function setConfig(userConfig: TokenKitConfig): void {
+    const currentConfig = globalStorage[CONFIG_KEY];
     const finalConfig = {
-        ...config,
+        ...currentConfig,
         ...userConfig,
     } as ResolvedConfig;
 
@@ -34,11 +41,13 @@ export function setConfig(userConfig: TokenKitConfig): void {
         throw new Error("[TokenKit] getContextStore and setContextStore must be defined together.");
     }
 
-    config = finalConfig;
+    globalStorage[CONFIG_KEY] = finalConfig;
 
     // Re-initialize global token manager if auth changed
-    if (config.auth) {
-        tokenManager = new TokenManager(config.auth, config.baseURL);
+    if (finalConfig.auth) {
+        globalStorage[MANAGER_KEY] = new TokenManager(finalConfig.auth, finalConfig.baseURL);
+    } else {
+        globalStorage[MANAGER_KEY] = undefined;
     }
 }
 
@@ -46,19 +55,30 @@ export function setConfig(userConfig: TokenKitConfig): void {
  * Get current configuration
  */
 export function getConfig(): ResolvedConfig {
-    return config;
+    return globalStorage[CONFIG_KEY];
 }
 
 /**
  * Get global token manager
  */
 export function getTokenManager(): TokenManager | undefined {
-    return tokenManager;
+    return globalStorage[MANAGER_KEY];
 }
 
 /**
  * Set global token manager (mainly for testing)
  */
 export function setTokenManager(manager: TokenManager | undefined): void {
-    tokenManager = manager;
+    globalStorage[MANAGER_KEY] = manager;
+}
+
+// Handle injected configuration from Astro integration
+try {
+    // @ts-ignore
+    const injectedConfig = typeof __TOKENKIT_CONFIG__ !== 'undefined' ? __TOKENKIT_CONFIG__ : undefined;
+    if (injectedConfig) {
+        setConfig(injectedConfig);
+    }
+} catch (e) {
+    // Ignore errors in environments where __TOKENKIT_CONFIG__ might be restricted
 }

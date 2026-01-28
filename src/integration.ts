@@ -30,11 +30,24 @@ import { setConfig } from './config';
  */
 export function tokenKit(config: TokenKitConfig): AstroIntegration {
     setConfig(config);
+    
+    // Create a serializable version of the config for the runtime
+    const serializableConfig = JSON.parse(JSON.stringify(config, (key, value) => {
+        if (typeof value === 'function') return undefined;
+        return value;
+    }));
+
     return {
         name: 'astro-tokenkit',
         hooks: {
-            'astro:config:setup': () => {
-                // Future-proofing: could add vite aliases or other setup here
+            'astro:config:setup': ({ updateConfig }) => {
+                updateConfig({
+                    vite: {
+                        define: {
+                            '__TOKENKIT_CONFIG__': JSON.stringify(serializableConfig)
+                        }
+                    }
+                });
                 console.log('[TokenKit] Integration initialized');
             },
         },
