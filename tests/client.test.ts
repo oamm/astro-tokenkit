@@ -140,7 +140,7 @@ describe('APIClient with global config', () => {
 
         expect(result).toBe('next-result');
         expect(next).toHaveBeenCalled();
-        expect(getContextStore).toHaveBeenCalled();
+        expect(setContextStore).toHaveBeenCalledWith(mockAstro);
     });
 
     it('should NOT skip runWithContext in middleware if both getContextStore and runWithContext are defined globally', async () => {
@@ -182,11 +182,7 @@ describe('APIClient with global config', () => {
 
         expect(result).toBe('next-result');
         expect(next).toHaveBeenCalled();
-        expect(getContextStore).toHaveBeenCalled();
-        expect(setContextStore).toHaveBeenCalledWith(expect.objectContaining({
-            cookies: mockAstro.cookies
-        }));
-        expect(storedCtx).not.toBeNull();
-        expect(storedCtx.cookies).toBe(mockAstro.cookies);
+        expect(setContextStore).toHaveBeenCalledWith(mockAstro);
+        expect(storedCtx).toBe(mockAstro);
     });
 });

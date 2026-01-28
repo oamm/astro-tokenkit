@@ -26,19 +26,10 @@ export function createMiddleware(): MiddlewareHandler {
             return next();
         };
 
-        // If getContextStore is defined, it means the context is managed externally (e.g., by a superior ALS)
-        // We skip runWithContext to avoid nesting ALS.run() unnecessarily,
-        // UNLESS a custom runWithContext is provided.
-        if (config.getContextStore && !config.runWithContext) {
-            let storage = config.getContextStore();
-
-            if (storage)
-                // Update existing reference
-                storage.cookies = ctx.cookies;
-            else if (config.setContextStore)
-                config.setContextStore({cookies: ctx.cookies});
-            else
-                console.error("[TokenKit] getContextStore returned null or undefined and no setter was found");
+        // If setContextStore is defined, it means the context is managed externally
+        // We establish the context for the current request.
+        if (config.setContextStore && !config.runWithContext) {
+            config.setContextStore(ctx);
             return runLogic();
         }
         const runner = config.runWithContext ?? defaultRunWithContext;

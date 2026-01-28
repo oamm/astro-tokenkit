@@ -116,6 +116,7 @@ const specializedClient = createClient({
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
 | `context` | `AsyncLocalStorage` | External AsyncLocalStorage instance. |
 | `getContextStore`| `() => TokenKitContext`| Custom method to retrieve the context store. |
+| `setContextStore`| `(ctx) => void`| Custom method to set the context store. |
 | `runWithContext`| `Function`| Custom runner to bind context. |
 
 ### Auth Configuration
