@@ -271,6 +271,11 @@ export interface ClientConfig {
  * TokenKit Global Configuration
  */
 export interface TokenKitConfig extends Partial<ClientConfig> {
+    /** 
+     * Whether to automatically inject the middleware (default: true).
+     * If false, you must manually export onRequest = api.middleware() in src/middleware.ts
+     */
+    autoMiddleware?: boolean;
 }
 
 /**

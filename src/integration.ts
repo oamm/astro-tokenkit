@@ -40,7 +40,7 @@ export function tokenKit(config: TokenKitConfig): AstroIntegration {
     return {
         name: 'astro-tokenkit',
         hooks: {
-            'astro:config:setup': ({ updateConfig }) => {
+            'astro:config:setup': ({ updateConfig, addMiddleware }) => {
                 updateConfig({
                     vite: {
                         define: {
@@ -48,6 +48,15 @@ export function tokenKit(config: TokenKitConfig): AstroIntegration {
                         }
                     }
                 });
+
+                // Autoinject the middleware
+                if (config.autoMiddleware !== false) {
+                    addMiddleware({
+                        entrypoint: 'astro-tokenkit/middleware',
+                        order: 'pre'
+                    });
+                }
+
                 console.log('[TokenKit] Integration initialized');
             },
         },

@@ -63,3 +63,8 @@ export function createMiddleware(): MiddlewareHandler {
         return defaultRunWithContext(ctx, runLogic);
     };
 }
+
+/**
+ * Standard Astro middleware export for autoinjection
+ */
+export const onRequest = createMiddleware();

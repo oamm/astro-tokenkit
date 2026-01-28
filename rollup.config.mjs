@@ -29,8 +29,38 @@ export default [
     external: ['astro', 'node:async_hooks'],
   },
   {
+    input: 'src/middleware.ts',
+    output: [
+      {
+        file: 'dist/middleware.js',
+        format: 'es',
+        sourcemap: true,
+      },
+      {
+        file: 'dist/middleware.cjs',
+        format: 'cjs',
+        sourcemap: true,
+      }
+    ],
+    plugins: [
+      resolve(),
+      typescript({
+        tsconfig: './tsconfig.json',
+        declaration: true,
+        declarationDir: 'dist',
+        rootDir: 'src',
+      }),
+    ],
+    external: ['astro', 'node:async_hooks'],
+  },
+  {
     input: 'dist/index.d.ts',
     output: [{ file: 'dist/index.d.ts', format: 'es' }],
+    plugins: [dts()],
+  },
+  {
+    input: 'dist/middleware.d.ts',
+    output: [{ file: 'dist/middleware.d.ts', format: 'es' }],
     plugins: [dts()],
   },
 ];
