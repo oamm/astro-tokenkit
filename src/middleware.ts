@@ -4,6 +4,8 @@ import type {MiddlewareHandler} from 'astro';
 import {runWithContext as defaultRunWithContext} from './client/context';
 import {getConfig, getTokenManager} from './config';
 
+const LOGGED_KEY = Symbol.for('astro-tokenkit.middleware.logged');
+
 /**
  * Create middleware for context binding and automatic token rotation
  */
@@ -11,6 +13,23 @@ export function createMiddleware(): MiddlewareHandler {
     return async (ctx, next) => {
         const tokenManager = getTokenManager();
         const config = getConfig();
+
+        const globalStorage = globalThis as any;
+        if (!globalStorage[LOGGED_KEY]) {
+            const authStatus = tokenManager ? 'enabled' : 'disabled';
+            let contextStrategy = 'default';
+
+            if (config.runWithContext) {
+                contextStrategy = 'custom (runWithContext)';
+            } else if (config.setContextStore) {
+                contextStrategy = 'custom (getter/setter)';
+            } else if (config.context) {
+                contextStrategy = 'custom (external AsyncLocalStorage)';
+            }
+
+            console.log(`[TokenKit] Middleware initialized (auth: ${authStatus}, context: ${contextStrategy})`);
+            globalStorage[LOGGED_KEY] = true;
+        }
 
         const runLogic = async () => {
             // Proactively ensure a valid session if auth is configured
