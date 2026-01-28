@@ -150,6 +150,12 @@ export function parseJWTPayload(token: string): Record<string, any> | null {
         }
 
         const payload = parts[1];
+        
+        // Better UTF-8 support for environments with Buffer (like Node.js/Astro)
+        if (typeof Buffer !== 'undefined') {
+            return JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+        }
+        
         const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
         return JSON.parse(decoded);
     } catch {

@@ -177,7 +177,7 @@ export class APIClient {
         const fullURL = this.buildURL(config.url, config.params);
 
         // Build headers
-        const headers = this.buildHeaders(config, ctx);
+        const headers = this.buildHeaders(config, ctx, fullURL);
 
         // Build request init
         const init: RequestInit = {
@@ -324,15 +324,15 @@ export class APIClient {
     /**
      * Build request headers
      */
-    private buildHeaders(config: RequestConfig, ctx: TokenKitContext): HeadersInit {
+    private buildHeaders(config: RequestConfig, ctx: TokenKitContext, targetURL: string): HeadersInit {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             ...this.config.headers,
             ...config.headers,
         };
 
-        // Add auth token if available
-        if (this.tokenManager && !config.skipAuth) {
+        // Add auth token if available (only for safe URLs)
+        if (this.tokenManager && !config.skipAuth && this.isSafeURL(targetURL)) {
             const session = this.tokenManager.getSession(ctx);
             if (session?.accessToken) {
                 const injectFn = this.config.auth?.injectToken ?? ((token, type) => `${type ?? 'Bearer'} ${token}`);
@@ -341,6 +341,20 @@ export class APIClient {
         }
 
         return headers;
+    }
+
+    /**
+     * Check if a URL is safe for token injection (same origin as baseURL)
+     */
+    private isSafeURL(url: string): boolean {
+        try {
+            const requestUrl = new URL(url, this.config.baseURL);
+            const baseUrl = new URL(this.config.baseURL || 'http://localhost');
+            return requestUrl.origin === baseUrl.origin;
+        } catch {
+            // Only allow relative paths if baseURL is missing or invalid
+            return !url.startsWith('http') && !url.startsWith('//');
+        }
     }
 
     /**

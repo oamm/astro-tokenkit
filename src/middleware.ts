@@ -18,9 +18,9 @@ export function createMiddleware(): MiddlewareHandler {
                 try {
                     // This handles token rotation (refresh) if needed
                     await tokenManager.ensure(ctx);
-                } catch (error) {
-                    // Log but don't block a request if rotation fails
-                    console.error('[TokenKit] Automatic token rotation failed:', error);
+                } catch (error: any) {
+                    // Log only the message to avoid leaking sensitive data in the error object
+                    console.error('[TokenKit] Automatic token rotation failed:', error.message || error);
                 }
             }
             return next();

@@ -82,5 +82,6 @@ export function isExpired(
         ? normalized.clockSkew
         : parseTime(normalized.clockSkew);
 
-    return now > expiresAt + clockSkew;
+    // Pessimistic: consider it expired if current time + skew is past expiration
+    return now + clockSkew > expiresAt;
 }

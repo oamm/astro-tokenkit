@@ -1,6 +1,6 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
-import { AuthError } from '../types';
+import {APIResponse, AuthError} from '../types';
 import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, clearTokens } from './storage';
@@ -54,7 +54,7 @@ export class TokenManager {
      * Perform login
      */
     async login(ctx: TokenKitContext, credentials: any, options?: LoginOptions): Promise<APIResponse<TokenBundle>> {
-        const url = this.baseURL + this.config.login;
+        const url = this.joinURL(this.baseURL, this.config.login);
 
         const contentType = this.config.contentType || 'application/json';
         const headers: Record<string, string> = {
@@ -143,7 +143,7 @@ export class TokenManager {
      * Internal refresh implementation
      */
     private async performRefresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, extraHeaders?: Record<string, string>): Promise<TokenBundle | null> {
-        const url = this.baseURL + this.config.refresh;
+        const url = this.joinURL(this.baseURL, this.config.refresh);
 
         const contentType = this.config.contentType || 'application/json';
         const headers: Record<string, string> = {
@@ -277,11 +277,19 @@ export class TokenManager {
         // Optionally call logout endpoint
         if (this.config.logout) {
             try {
-                const url = this.baseURL + this.config.logout;
-                await fetch(url, { method: 'POST' });
+                const url = this.joinURL(this.baseURL, this.config.logout);
+                const session = this.getSession(ctx);
+                const headers: Record<string, string> = {};
+
+                if (session?.accessToken) {
+                    const injectFn = this.config.injectToken ?? ((token, type) => `${type ?? 'Bearer'} ${token}`);
+                    headers['Authorization'] = injectFn(session.accessToken, session.tokenType);
+                }
+
+                await fetch(url, { method: 'POST', headers });
             } catch (error) {
                 // Ignore logout endpoint errors
-                console.warn('Logout endpoint failed:', error);
+                console.warn('[TokenKit] Logout endpoint failed:', error);
             }
         }
 
@@ -318,12 +326,16 @@ export class TokenManager {
      * Create flight key for single-flight deduplication
      */
     private createFlightKey(token: string): string {
-        let hash = 0;
-        for (let i = 0; i < token.length; i++) {
-            const char = token.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return `flight_${Math.abs(hash).toString(36)}`;
+        // Avoid weak hashing of sensitive tokens
+        return `refresh_${token}`;
+    }
+
+    /**
+     * Join base URL and path safely
+     */
+    private joinURL(base: string, path: string): string {
+        const b = base.endsWith('/') ? base : base + '/';
+        const p = path.startsWith('/') ? path.slice(1) : path;
+        return b + p;
     }
 }
