@@ -26,13 +26,21 @@ export function createMiddleware(): MiddlewareHandler {
             return next();
         };
 
-        // If setContextStore is defined, it means the context is managed externally
-        // We establish the context for the current request.
-        if (config.setContextStore && !config.runWithContext) {
-            config.setContextStore(ctx);
+        const setupAndRun = async () => {
+            if (config.setContextStore) {
+                config.setContextStore(ctx);
+            }
             return runLogic();
+        };
+
+        if (config.runWithContext) {
+            return config.runWithContext(ctx, setupAndRun);
         }
-        const runner = config.runWithContext ?? defaultRunWithContext;
-        return runner(ctx, runLogic);
+
+        if (config.setContextStore) {
+            return setupAndRun();
+        }
+
+        return defaultRunWithContext(ctx, runLogic);
     };
 }

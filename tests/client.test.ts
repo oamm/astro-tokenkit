@@ -158,10 +158,11 @@ describe('APIClient with global config', () => {
         const middleware = defineMiddleware();
 
         const result = await middleware(mockAstro, next);
-
+        
         expect(result).toBe('next-result');
         expect(next).toHaveBeenCalled();
         expect(runWithContext).toHaveBeenCalled();
+        expect(setContextStore).toHaveBeenCalledWith(mockAstro);
     });
 
     it('should initialize context store via setContextStore if getContextStore returns null', async () => {

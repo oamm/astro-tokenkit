@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMiddleware } from '../src/middleware';
-import { setConfig, getConfig } from '../src/config';
+import { createMiddleware } from '../src';
+import { setConfig } from '../src';
 import type { APIContext } from 'astro';
 
 describe('Middleware with custom store', () => {
