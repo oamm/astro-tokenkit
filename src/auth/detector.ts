@@ -43,6 +43,14 @@ const EXPIRES_IN_FIELDS = [
 ];
 
 /**
+ * Common field names for token type
+ */
+const TOKEN_TYPE_FIELDS = [
+    'token_type',
+    'tokenType',
+];
+
+/**
  * Common field names for session payload
  */
 const SESSION_PAYLOAD_FIELDS = [
@@ -119,10 +127,14 @@ export function autoDetectFields(body: any, fieldMapping?: FieldMapping): TokenB
     // Detect session payload (optional)
     const sessionPayload = findField(SESSION_PAYLOAD_FIELDS, fieldMapping?.sessionPayload);
 
+    // Detect token type (optional)
+    const tokenType = findField(TOKEN_TYPE_FIELDS, fieldMapping?.tokenType);
+
     return {
         accessToken,
         refreshToken,
         accessExpiresAt,
+        tokenType: tokenType || undefined,
         sessionPayload: sessionPayload || undefined,
     };
 }

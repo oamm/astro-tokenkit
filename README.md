@@ -130,10 +130,10 @@ const specializedClient = createClient({
 | `loginData` | `Record<string, any>` | Extra data to be sent with login request. |
 | `refreshData` | `Record<string, any>` | Extra data to be sent with refresh request. |
 | `refreshRequestField` | `string` | Field name for the refresh token in the refresh request (default: `refreshToken`). |
-| `fields` | `FieldMapping` | Custom mapping for token fields in API responses. |
+| `fields` | `FieldMapping` | Custom mapping for token fields in API responses (`accessToken`, `refreshToken`, `expiresAt`, `expiresIn`, `tokenType`, `sessionPayload`). |
 | `parseLogin` | `Function` | Custom parser for login response: `(body: any) => TokenBundle`. |
 | `parseRefresh`| `Function` | Custom parser for refresh response: `(body: any) => TokenBundle`. |
-| `injectToken` | `Function` | Custom token injection: `(token: string) => string` (default: Bearer). |
+| `injectToken` | `Function` | Custom token injection: `(token: string, type?: string) => string` (default: Bearer). |
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
 

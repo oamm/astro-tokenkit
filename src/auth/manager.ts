@@ -214,6 +214,7 @@ export class TokenManager {
             return {
                 accessToken: bundle.accessToken,
                 expiresAt: bundle.accessExpiresAt,
+                tokenType: bundle.tokenType,
                 payload: bundle.sessionPayload ?? parseJWTPayload(bundle.accessToken) ?? undefined,
             };
         }
@@ -229,6 +230,7 @@ export class TokenManager {
                 return {
                     accessToken: bundle.accessToken,
                     expiresAt: bundle.accessExpiresAt,
+                    tokenType: bundle.tokenType,
                     payload: bundle.sessionPayload ?? parseJWTPayload(bundle.accessToken) ?? undefined,
                 };
             }
@@ -244,6 +246,7 @@ export class TokenManager {
         return {
             accessToken: tokens.accessToken,
             expiresAt: tokens.expiresAt,
+            tokenType: tokens.tokenType ?? undefined,
             payload: parseJWTPayload(tokens.accessToken) ?? undefined,
         };
     }
@@ -279,6 +282,7 @@ export class TokenManager {
         return {
             accessToken: tokens.accessToken,
             expiresAt: tokens.expiresAt,
+            tokenType: tokens.tokenType ?? undefined,
             payload: parseJWTPayload(tokens.accessToken) ?? undefined,
         };
     }

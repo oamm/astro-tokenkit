@@ -10,6 +10,7 @@ export interface TokenBundle {
     accessToken: string;
     refreshToken: string;
     accessExpiresAt: number; // Unix timestamp in seconds
+    tokenType?: string;
     refreshExpiresAt?: number;
     sessionPayload?: Record<string, any>;
 }
@@ -29,6 +30,7 @@ export interface TokenKitContext {
 export interface Session {
     accessToken: string;
     expiresAt: number;
+    tokenType?: string;
     payload?: Record<string, any>;
 }
 
@@ -78,6 +80,7 @@ export interface FieldMapping {
     refreshToken?: string;
     expiresAt?: string;
     expiresIn?: string;
+    tokenType?: string;
     sessionPayload?: string;
 }
 
@@ -139,7 +142,7 @@ export interface AuthConfig {
     parseRefresh?: (body: any) => TokenBundle;
 
     /** Custom token injection function (default: Bearer) */
-    injectToken?: (token: string) => string;
+    injectToken?: (token: string, type?: string) => string;
 
     /** Refresh policy */
     policy?: RefreshPolicy;

@@ -10,6 +10,7 @@ export interface CookieNames {
     refreshToken: string;
     expiresAt: string;
     lastRefreshAt: string;
+    tokenType: string;
 }
 
 /**
@@ -22,6 +23,7 @@ export function getCookieNames(prefix?: string): CookieNames {
         refreshToken: `${p}refresh_token`,
         expiresAt: `${p}access_expires_at`,
         lastRefreshAt: `${p}last_refresh_at`,
+        tokenType: `${p}token_type`,
     };
 }
 
@@ -84,6 +86,15 @@ export function storeTokens(
         maxAge: accessMaxAge,
         path: '/',
     });
+
+    // Set token type if available
+    if (bundle.tokenType) {
+        ctx.cookies.set(names.tokenType, bundle.tokenType, {
+            ...options,
+            maxAge: accessMaxAge,
+            path: '/',
+        });
+    }
 }
 
 /**
@@ -97,11 +108,13 @@ export function retrieveTokens(
     refreshToken: string | null;
     expiresAt: number | null;
     lastRefreshAt: number | null;
+    tokenType: string | null;
 } {
     const names = getCookieNames(cookieConfig.prefix);
 
     const accessToken = ctx.cookies.get(names.accessToken)?.value || null;
     const refreshToken = ctx.cookies.get(names.refreshToken)?.value || null;
+    const tokenType = ctx.cookies.get(names.tokenType)?.value || null;
 
     const expiresAtStr = ctx.cookies.get(names.expiresAt)?.value;
     const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
@@ -109,7 +122,7 @@ export function retrieveTokens(
     const lastRefreshAtStr = ctx.cookies.get(names.lastRefreshAt)?.value;
     const lastRefreshAt = lastRefreshAtStr ? parseInt(lastRefreshAtStr, 10) : null;
 
-    return { accessToken, refreshToken, expiresAt, lastRefreshAt };
+    return { accessToken, refreshToken, expiresAt, lastRefreshAt, tokenType };
 }
 
 /**
@@ -123,4 +136,5 @@ export function clearTokens(ctx: TokenKitContext, cookieConfig: CookieConfig = {
     ctx.cookies.delete(names.refreshToken, { ...options, path: '/' });
     ctx.cookies.delete(names.expiresAt, { ...options, path: '/' });
     ctx.cookies.delete(names.lastRefreshAt, { ...options, path: '/' });
+    ctx.cookies.delete(names.tokenType, { ...options, path: '/' });
 }

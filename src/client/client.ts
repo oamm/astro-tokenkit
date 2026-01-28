@@ -338,8 +338,8 @@ export class APIClient {
         if (this.tokenManager && !config.skipAuth) {
             const session = this.tokenManager.getSession(ctx);
             if (session?.accessToken) {
-                const injectFn = this.config.auth?.injectToken ?? ((token) => `Bearer ${token}`);
-                headers['Authorization'] = injectFn(session.accessToken);
+                const injectFn = this.config.auth?.injectToken ?? ((token, type) => `${type ?? 'Bearer'} ${token}`);
+                headers['Authorization'] = injectFn(session.accessToken, session.tokenType);
             }
         }
 
