@@ -79,7 +79,7 @@ export class APIClient {
     /**
      * GET request
      */
-    async get<T = any>(url: string, options?: RequestOptions): Promise<T> {
+    async get<T = any>(url: string, options?: RequestOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'GET',
             url,
@@ -90,7 +90,7 @@ export class APIClient {
     /**
      * POST request
      */
-    async post<T = any>(url: string, data?: any, options?: RequestOptions): Promise<T> {
+    async post<T = any>(url: string, data?: any, options?: RequestOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'POST',
             url,
@@ -102,7 +102,7 @@ export class APIClient {
     /**
      * PUT request
      */
-    async put<T = any>(url: string, data?: any, options?: RequestOptions): Promise<T> {
+    async put<T = any>(url: string, data?: any, options?: RequestOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'PUT',
             url,
@@ -114,7 +114,7 @@ export class APIClient {
     /**
      * PATCH request
      */
-    async patch<T = any>(url: string, data?: any, options?: RequestOptions): Promise<T> {
+    async patch<T = any>(url: string, data?: any, options?: RequestOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'PATCH',
             url,
@@ -126,7 +126,7 @@ export class APIClient {
     /**
      * DELETE request
      */
-    async delete<T = any>(url: string, options?: RequestOptions): Promise<T> {
+    async delete<T = any>(url: string, options?: RequestOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'DELETE',
             url,
@@ -137,20 +137,16 @@ export class APIClient {
     /**
      * Generic request method
      */
-    async request<T = any>(config: RequestConfig): Promise<T> {
+    async request<T = any>(config: RequestConfig): Promise<APIResponse<T>> {
         const ctx = getContextStore();
         let attempt = 0;
-        let lastError: Error | undefined;
 
         while (true) {
             attempt++;
 
             try {
-                const response = await this.executeRequest<T>(config, ctx, attempt);
-                return response.data;
+                return await this.executeRequest<T>(config, ctx, attempt);
             } catch (error) {
-                lastError = error as Error;
-
                 // Check if we should retry
                 if (shouldRetry((error as APIError).status, attempt, this.config.retry)) {
                     const delay = calculateDelay(attempt, this.config.retry);
@@ -303,6 +299,7 @@ export class APIClient {
             statusText: response.statusText,
             headers: response.headers,
             url,
+            ok: response.ok,
         };
     }
 
@@ -349,7 +346,7 @@ export class APIClient {
     /**
      * Login
      */
-    async login(credentials: any, options?: LoginOptions): Promise<TokenBundle> {
+    async login(credentials: any, options?: LoginOptions): Promise<APIResponse<TokenBundle>> {
         if (!this.tokenManager) {
             throw new Error('Auth is not configured for this client');
         }

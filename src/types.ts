@@ -70,6 +70,7 @@ export interface APIResponse<T = any> {
     statusText: string;
     headers: Headers;
     url: string;
+    ok: boolean;
 }
 
 /**

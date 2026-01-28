@@ -72,7 +72,7 @@ describe('APIClient with global config', () => {
 
         await externalStorage.run(mockAstro, async () => {
             const result = await client.get('/test');
-            expect(result).toEqual({ data: 'ok' });
+            expect(result.data).toEqual({ data: 'ok' });
         });
     });
 

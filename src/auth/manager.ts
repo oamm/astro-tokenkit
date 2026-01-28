@@ -53,69 +53,78 @@ export class TokenManager {
     /**
      * Perform login
      */
-    async login(ctx: TokenKitContext, credentials: any, options?: LoginOptions): Promise<TokenBundle> {
+    async login(ctx: TokenKitContext, credentials: any, options?: LoginOptions): Promise<APIResponse<TokenBundle>> {
+        const url = this.baseURL + this.config.login;
+
+        const contentType = this.config.contentType || 'application/json';
+        const headers: Record<string, string> = {
+            'Content-Type': contentType,
+            ...this.config.headers,
+            ...options?.headers,
+        };
+
+        const data = {
+            ...this.config.loginData,
+            ...options?.data,
+            ...credentials,
+        };
+
+        let requestBody: string;
+        if (contentType === 'application/x-www-form-urlencoded') {
+            requestBody = new URLSearchParams(data).toString();
+        } else {
+            requestBody = JSON.stringify(data);
+        }
+
+        let response: Response;
         try {
-            const url = this.baseURL + this.config.login;
-
-            const contentType = this.config.contentType || 'application/json';
-            const headers: Record<string, string> = {
-                'Content-Type': contentType,
-                ...this.config.headers,
-                ...options?.headers,
-            };
-
-            const data = {
-                ...this.config.loginData,
-                ...options?.data,
-                ...credentials,
-            };
-
-            let requestBody: string;
-            if (contentType === 'application/x-www-form-urlencoded') {
-                requestBody = new URLSearchParams(data).toString();
-            } else {
-                requestBody = JSON.stringify(data);
-            }
-
-            const response = await fetch(url, {
+            response = await fetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
-            }).catch(error => {
-                throw new AuthError(`Login request failed: ${error.message}`);
             });
-
-            if (!response.ok) {
-                throw new AuthError(`Login failed: ${response.status} ${response.statusText}`, response.status, response);
-            }
-
-            const body = await response.json().catch(() => ({}));
-
-            // Parse response
-            let bundle: TokenBundle;
-            try {
-                bundle = this.config.parseLogin
-                    ? this.config.parseLogin(body)
-                    : autoDetectFields(body, this.config.fields);
-            } catch (error: any) {
-                throw new AuthError(`Invalid login response: ${error.message}`, response.status, response);
-            }
-
-            // Store in cookies
-            storeTokens(ctx, bundle, this.config.cookies);
-
-            // Call onLogin callback if provided
-            if (options?.onLogin) {
-                await options.onLogin(bundle, body, ctx);
-            }
-
-            return bundle;
         } catch (error: any) {
-            if (options?.onError && error instanceof AuthError) {
-                await options.onError(error, ctx);
-            }
-            throw error;
+            const authError = new AuthError(`Login request failed: ${error.message}`);
+            if (options?.onError) await options.onError(authError, ctx);
+            throw authError;
         }
+
+        if (!response.ok) {
+            const authError = new AuthError(`Login failed: ${response.status} ${response.statusText}`, response.status, response);
+            if (options?.onError) await options.onError(authError, ctx);
+            throw authError;
+        }
+
+        const body = await response.json().catch(() => ({}));
+
+        // Parse response
+        let bundle: TokenBundle;
+        try {
+            bundle = this.config.parseLogin
+                ? this.config.parseLogin(body)
+                : autoDetectFields(body, this.config.fields);
+        } catch (error: any) {
+            const authError = new AuthError(`Invalid login response: ${error.message}`, response.status, response);
+            if (options?.onError) await options.onError(authError, ctx);
+            throw authError;
+        }
+
+        // Store in cookies
+        storeTokens(ctx, bundle, this.config.cookies);
+
+        // Call onLogin callback if provided
+        if (options?.onLogin) {
+            await options.onLogin(bundle, body, ctx);
+        }
+
+        return {
+            data: bundle,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            url: response.url,
+            ok: response.ok,
+        };
     }
 
     /**
@@ -157,13 +166,16 @@ export class TokenManager {
             requestBody = JSON.stringify(data);
         }
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: requestBody,
-        }).catch(error => {
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: requestBody,
+            });
+        } catch (error: any) {
             throw new AuthError(`Refresh request failed: ${error.message}`);
-        });
+        }
 
         if (!response.ok) {
             // 401/403 = invalid refresh token

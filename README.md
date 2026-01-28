@@ -61,8 +61,8 @@ Now you can use the `api` client anywhere in your Astro pages or components with
 // src/pages/profile.astro
 import { api } from 'astro-tokenkit';
 
-// No need to pass context, it's handled by middleware!
-const user = await api.get('/me');
+// Request methods return an APIResponse object
+const { data: user } = await api.get('/me');
 ---
 
 <h1>Welcome, {user.name}</h1>
@@ -168,7 +168,7 @@ If you prefer not to use middleware, you can bind the Astro context manually for
 ```typescript
 import { runWithContext } from 'astro-tokenkit';
 
-const data = await runWithContext(Astro, () => api.get('/data'));
+const { data } = await runWithContext(Astro, () => api.get('/data'));
 ```
 
 ### Interceptors
@@ -191,7 +191,7 @@ const api = createClient({
 
 ```typescript
 // In an API route or server-side component
-await api.login({ username, password }, {
+const { data: bundle } = await api.login({ username, password }, {
   onLogin: (bundle, body, ctx) => {
     // Post-login logic (e.g., sync session to another store)
     console.log('User logged in!', bundle.sessionPayload);
@@ -202,13 +202,44 @@ await api.login({ username, password }, {
   }
 });
 
-// login also returns a Promise, so you can use .catch()
-await api.login(credentials).catch(err => {
-  console.error('Caught error:', err.message);
-});
-
 await api.logout();
 ```
+
+### Using Promises (.then, .catch, .finally)
+
+All API methods return a Promise that resolves to an `APIResponse` object. You can use traditional promise chaining:
+
+```typescript
+// Example with GET request
+api.get('/me')
+  .then(({ data: user, status }) => {
+    console.log(`User ${user.name} fetched with status ${status}`);
+  })
+  .catch(err => {
+    console.error('Failed to fetch user:', err.message);
+  })
+  .finally(() => {
+    console.log('Request finished');
+  });
+
+// Example with login
+api.login(credentials)
+  .then(({ data: token }) => {
+    console.log('Successfully logged in!', token.accessToken);
+  })
+  .catch(err => {
+    if (err instanceof AuthError) {
+      console.error('Authentication failed:', err.message);
+    } else {
+      console.error('An unexpected error occurred:', err.message);
+    }
+  })
+  .finally(() => {
+    // E.g. stop loading state
+  });
+```
+
+> **Note:** Since all methods return an `APIResponse` object, you can use destructuring in `.then()` to access the data directly, which allows for clean syntax like `.then(({ data: token }) => ... )`.
 
 ## License
 
