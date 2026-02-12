@@ -1,6 +1,6 @@
 {
   "name": "astro-tokenkit",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "A powerful API client for Astro with automatic token rotation, session management, and seamless context integration.",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -15,6 +15,11 @@
       "types": "./dist/middleware.d.ts",
       "import": "./dist/middleware.js",
       "require": "./dist/middleware.cjs"
+    },
+    "./client-init": {
+      "types": "./dist/client/tk-client.d.ts",
+      "import": "./dist/client/tk-client.js",
+      "require": "./dist/client/tk-client.cjs"
     }
   },
   "files": [

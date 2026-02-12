@@ -1,7 +1,7 @@
 // packages/astro-tokenkit/src/types.ts
 
 import type { AstroCookies } from 'astro';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import type { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
  * Token bundle returned from auth endpoints
@@ -206,6 +206,39 @@ export interface RetryConfig {
 }
 
 /**
+ * Idle timeout configuration
+ */
+export interface IdleConfig {
+    /** Idle timeout in seconds */
+    timeout: number;
+    /** 
+     * Callback when idle timeout is reached.
+     * NOTE: This function is only used if you manually initialize IdleManager.
+     * If using the Astro integration, use window.addEventListener('tk:idle', ...) instead.
+     */
+    onIdle?: () => void;
+    /** Whether to automatically logout on idle (default: true) */
+    autoLogout?: boolean;
+    /** Whether to monitor activity only on the active tab (default: true) */
+    activeTabOnly?: boolean;
+    /** 
+     * Custom data to pass to the 'tk:idle' event. 
+     * Ideal for configuring client-side alerts (e.g. SweetAlert).
+     */
+    alert?: AlertOptions | any;
+}
+
+/**
+ * Alert options for client-side notifications (e.g. SweetAlert)
+ */
+export interface AlertOptions {
+    title?: string;
+    text?: string;
+    icon?: 'success' | 'error' | 'warning' | 'info' | 'question' | string;
+    [key: string]: any;
+}
+
+/**
  * Request interceptor
  */
 export type RequestInterceptor = (
@@ -259,8 +292,11 @@ export interface ClientConfig {
 
     /** Interceptors */
     interceptors?: InterceptorsConfig;
+
+    /** Idle timeout configuration */
+    idle?: IdleConfig;
     
-    /** AsyncLocalStorage instance */
+    /** AsyncLocalStorage instance (Node only) */
     context?: AsyncLocalStorage<any>;
     
     /** Custom context store getter */

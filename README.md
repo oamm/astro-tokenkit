@@ -114,6 +114,7 @@ const specializedClient = createClient({
 | `timeout` | `number` | Request timeout in milliseconds (default: 30000). |
 | `retry` | `RetryConfig` | Retry strategy for failed requests. |
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
+| `idle` | `IdleConfig` | Inactivity session timeout configuration. |
 | `context` | `AsyncLocalStorage` | External AsyncLocalStorage instance. |
 | `getContextStore`| `() => TokenKitContext`| Custom method to retrieve the context store. |
 | `setContextStore`| `(ctx) => void`| Custom method to set the context store. |
@@ -137,6 +138,47 @@ const specializedClient = createClient({
 | `injectToken` | `Function` | Custom token injection: `(token: string, type?: string) => string` (default: Bearer). |
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
+
+### Idle Session Timeout
+
+Astro TokenKit automatically monitors user inactivity and closes the session across all open tabs. This feature uses `BroadcastChannel` to synchronize activity and logout events.
+
+**Important:** When using the Astro integration, the `onIdle` function cannot be passed in `astro.config.mjs` because it is not serializable. Instead, listen for the `tk:idle` event on the client.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `timeout` | `number` | **Required.** Inactivity timeout in seconds. |
+| `autoLogout`| `boolean` | Whether to automatically trigger logout by calling the configured logout endpoint (default: `true`). |
+| `activeTabOnly` | `boolean` | Whether to track activity only on the active tab to save CPU/memory (default: `true`). |
+| `alert` | `any` | Custom data to be passed to the `tk:idle` event. Ideal for configuring SweetAlert options. |
+
+#### Handling Idle Events (e.g. SweetAlert)
+
+On the client (browser), you can listen for the `tk:idle` event to show a notification. You can use the `alert` property from your configuration to pass options to your alert plugin.
+
+```javascript
+// astro.config.mjs
+tokenKit({
+  idle: {
+    timeout: 300,
+    alert: {
+      title: "Session Expired",
+      text: "You have been logged out due to inactivity.",
+      icon: "warning"
+    }
+  }
+})
+```
+
+```html
+<script>
+  window.addEventListener('tk:idle', (event) => {
+    const options = event.detail.alert;
+    // Use SweetAlert or any other plugin
+    swal(options);
+  });
+</script>
+```
 
 ### Login Options
 
@@ -241,6 +283,26 @@ api.login(credentials)
 ```
 
 > **Note:** Since all methods return an `APIResponse` object, you can use destructuring in `.then()` to access the data directly, which allows for clean syntax like `.then(({ data: token }) => ... )`.
+
+## Performance
+
+Astro TokenKit is designed with a "low impact" philosophy. It introduces negligible overhead to your requests while providing powerful features like automatic token rotation.
+
+### Benchmark Results
+
+Run on a standard development machine using `npm run bench`:
+
+| Scenario | Operations/sec | Latency (Overhead) |
+| :--- | :--- | :--- |
+| **Native fetch (Baseline)** | ~720,000 | 0µs |
+| **Middleware overhead** | ~1,680,000 | <1µs |
+| **APIClient (No Auth)** | ~200,000 | ~3.5µs |
+| **APIClient (With Auth)** | ~150,000 | ~5.3µs |
+
+**Key Takeaways:**
+- **Zero-impact Middleware:** The middleware adds less than 1 microsecond to each Astro request.
+- **Ultra-low Client Overhead:** Using the `APIClient` adds about 3-5 microseconds per request compared to native `fetch`.
+- **Negligible in Real World:** In a typical scenario where a network request takes 10ms (10,000µs), Astro TokenKit adds less than **0.05%** latency.
 
 ## License
 

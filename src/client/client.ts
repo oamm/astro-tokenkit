@@ -1,7 +1,17 @@
 // packages/astro-tokenkit/src/client/client.ts
 
-import type {APIResponse, ClientConfig, RequestConfig, RequestOptions, Session, TokenKitContext, TokenKitConfig,
-    AuthConfig, LoginOptions, TokenBundle} from '../types';
+import type {
+    APIResponse,
+    AuthConfig,
+    ClientConfig,
+    LoginOptions,
+    RequestConfig,
+    RequestOptions,
+    Session,
+    TokenBundle,
+    TokenKitConfig,
+    TokenKitContext
+} from '../types';
 import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
 import {TokenManager} from '../auth/manager';
 import {getContextStore} from './context';
@@ -375,7 +385,7 @@ export class APIClient {
         }
 
         const context = getContextStore();
-        return this.tokenManager.login(context, credentials, options);
+        return await this.tokenManager.login(context, credentials, options);
     }
 
     /**
