@@ -21,20 +21,16 @@ class SingleFlight {
         const existing = this.inFlight.get(key);
         if (existing) return existing;
 
-        const promise = this.doExecute(key, fn);
+        const promise = (async () => {
+            try {
+                return await fn();
+            } finally {
+                this.inFlight.delete(key);
+            }
+        })();
+
         this.inFlight.set(key, promise);
         return promise;
-    }
-
-    private async doExecute(
-        key: string,
-        fn: () => Promise<TokenBundle | null>
-    ): Promise<TokenBundle | null> {
-        try {
-            return await fn();
-        } finally {
-            this.inFlight.delete(key);
-        }
     }
 }
 
@@ -78,17 +74,24 @@ export class TokenManager {
             requestBody = JSON.stringify(data);
         }
 
+        const timeout = options?.timeout ?? this.config.timeout ?? 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
         let response: Response;
         try {
             response = await safeFetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
+                signal: controller.signal,
             }, this.config);
         } catch (error: any) {
             const authError = new AuthError(`Login request failed: ${error.message}`, undefined, undefined, undefined, error);
             if (options?.onError) await options.onError(authError, ctx);
             throw authError;
+        } finally {
+            clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
@@ -168,15 +171,22 @@ export class TokenManager {
             requestBody = JSON.stringify(data);
         }
 
+        const timeout = options?.timeout ?? this.config.timeout ?? 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
         let response: Response;
         try {
             response = await safeFetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
+                signal: controller.signal,
             }, this.config);
         } catch (error: any) {
             throw new AuthError(`Refresh request failed: ${error.message}`, undefined, undefined, undefined, error);
+        } finally {
+            clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
@@ -214,7 +224,7 @@ export class TokenManager {
     /**
      * Ensure valid tokens (with automatic refresh)
      */
-    async ensure(ctx: TokenKitContext, options?: AuthOptions, headers?: Record<string, string>): Promise<Session | null> {
+    async ensure(ctx: TokenKitContext, options?: AuthOptions, headers?: Record<string, string>, force: boolean = false): Promise<Session | null> {
         const now = Math.floor(Date.now() / 1000);
         const tokens = retrieveTokens(ctx, this.config.cookies);
 
@@ -223,14 +233,17 @@ export class TokenManager {
             return null;
         }
 
-        // Token expired
-        if (isExpired(tokens.expiresAt, now, this.config.policy)) {
+        // Token expired or force refresh
+        if (force || isExpired(tokens.expiresAt, now, this.config.policy)) {
             const flightKey = this.createFlightKey(tokens.refreshToken);
             const bundle = await this.singleFlight.execute(flightKey, () =>
                 this.refresh(ctx, tokens.refreshToken!, options, headers)
             );
 
             if (!bundle) return null;
+
+            // Ensure tokens are stored in the current context (in case of shared flight)
+            storeTokens(ctx, bundle, this.config.cookies);
 
             return {
                 accessToken: bundle.accessToken,
@@ -248,6 +261,9 @@ export class TokenManager {
             );
 
             if (bundle) {
+                // Ensure tokens are stored in the current context (in case of shared flight)
+                storeTokens(ctx, bundle, this.config.cookies);
+
                 return {
                     accessToken: bundle.accessToken,
                     expiresAt: bundle.accessExpiresAt,
@@ -278,6 +294,10 @@ export class TokenManager {
     async logout(ctx: TokenKitContext): Promise<void> {
         // Optionally call logout endpoint
         if (this.config.logout) {
+            const timeout = this.config.timeout ?? 10000;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
             try {
                 const url = this.joinURL(this.baseURL, this.config.logout);
                 const session = this.getSession(ctx);
@@ -288,10 +308,16 @@ export class TokenManager {
                     headers['Authorization'] = injectFn(session.accessToken, session.tokenType);
                 }
 
-                await safeFetch(url, { method: 'POST', headers }, this.config);
+                await safeFetch(url, { 
+                    method: 'POST', 
+                    headers,
+                    signal: controller.signal,
+                }, this.config);
             } catch (error) {
                 // Ignore logout endpoint errors
                 logger.debug('[TokenKit] Logout endpoint failed:', error);
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
 

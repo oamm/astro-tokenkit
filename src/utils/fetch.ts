@@ -2,6 +2,8 @@
 
 import type { ClientConfig, AuthConfig } from '../types';
 
+let sharedInsecureAgent: any = null;
+
 /**
  * Perform a fetch request with optional certificate validation bypass
  */
@@ -14,18 +16,26 @@ export async function safeFetch(
     const fetchOptions: any = { ...init };
 
     if (config.dangerouslyIgnoreCertificateErrors && typeof process !== 'undefined') {
-        // In Node.js environment
         try {
-            // Try to use undici Agent if available (it is built-in in Node 18+)
-            // However, we might need to import it if we want to create an Agent.
-            // Since we don't want to depend on undici in package.json, we use dynamic import.
-            // But wait, undici's Agent is what we need.
-            
-            // As a fallback and most reliable way for self-signed certs in Node without extra deps:
-            process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-            
-            // NOTE: This affects the whole process. We should ideally only do this if it's not already 0.
-            // But for a dev tool / specialized library, it's often what's needed.
+            // Try to use undici Agent if available to avoid global process.env changes
+            if (!sharedInsecureAgent) {
+                // @ts-ignore
+                const undici = await import('undici').catch(() => null);
+                if (undici && undici.Agent) {
+                    sharedInsecureAgent = new undici.Agent({
+                        connect: { rejectUnauthorized: false }
+                    });
+                }
+            }
+
+            if (sharedInsecureAgent) {
+                fetchOptions.dispatcher = sharedInsecureAgent;
+            } else {
+                // Fallback to global setting (less secure, but only way without undici)
+                if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
+                    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+                }
+            }
         } catch (e) {
             // Ignore
         }

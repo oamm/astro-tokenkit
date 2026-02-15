@@ -233,8 +233,8 @@ export class APIClient {
 
             // Handle 401 (try refresh and retry once)
             if (response.status === 401 && this.tokenManager && !config.skipAuth && attempt === 1) {
-                // Clear and try fresh session
-                const session = await this.tokenManager.ensure(ctx, config.auth, config.headers);
+                // Clear and try fresh session (force refresh)
+                const session = await this.tokenManager.ensure(ctx, config.auth, config.headers, true);
                 if (session) {
                     // Retry with new token
                     return this.executeRequest<T>(config, ctx, attempt + 1);

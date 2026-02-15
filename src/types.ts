@@ -101,6 +101,8 @@ export type OnErrorCallback = (error: AuthError, ctx: TokenKitContext) => void |
 export interface AuthOptions {
     /** Extra data for this specific auth request (login/refresh) */
     data?: Record<string, any>;
+    /** Request timeout in ms for this auth request */
+    timeout?: number;
 }
 
 /**
@@ -109,6 +111,8 @@ export interface AuthOptions {
 export interface LoginOptions extends AuthOptions {
     /** Extra headers for this specific login request */
     headers?: Record<string, string>;
+    /** Request timeout in ms for this login request */
+    timeout?: number;
     /** Callback after successful login */
     onLogin?: OnLoginCallback;
     /** Callback after failed login */
@@ -151,6 +155,9 @@ export interface AuthConfig {
 
     /** Custom token injection function (default: Bearer) */
     injectToken?: (token: string, type?: string) => string;
+
+    /** Request timeout in ms for auth requests (login, refresh, logout) */
+    timeout?: number;
 
     /** Refresh policy */
     policy?: RefreshPolicy;
