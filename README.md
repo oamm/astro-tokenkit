@@ -307,3 +307,17 @@ Run on a standard development machine using `npm run bench`:
 ## License
 
 MIT © [oamm](https://github.com/oamm)
+
+---
+
+## Playground
+
+We've included a [playground](./playground) project to quickly test the integration.
+
+To run the playground:
+
+```bash
+npm run playground
+```
+
+This will install the dependencies and start the Astro dev server for the playground.

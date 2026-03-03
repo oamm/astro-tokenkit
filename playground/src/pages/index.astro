@@ -1,0 +1,76 @@
+---
+// playground/src/pages/index.astro
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Astro TokenKit Playground</title>
+	</head>
+	<body>
+		<div style="font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px;">
+			<h1>Astro TokenKit Playground</h1>
+			
+			<div style="background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+				<h2>Plugin Status</h2>
+				<p>This page tests if <strong>astro-tokenkit</strong> is correctly integrated.</p>
+				<p>Open the console to see the integration logs.</p>
+			</div>
+
+			<div style="display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+				<button id="login" style="padding: 10px; cursor: pointer;">Simulate Login</button>
+				<button id="logout" style="padding: 10px; cursor: pointer;">Logout</button>
+				<button id="fetch" style="padding: 10px; cursor: pointer;">Fetch Protected Data</button>
+			</div>
+
+			<pre id="output" style="background: #222; color: #eee; padding: 15px; border-radius: 8px; margin-top: 20px; min-height: 100px; overflow-x: auto;">// Output will appear here</pre>
+		</div>
+
+		<script>
+			// We can import from 'astro-tokenkit' directly
+			import { api } from 'astro-tokenkit';
+			
+			const output = document.getElementById('output');
+			const loginBtn = document.getElementById('login');
+			const logoutBtn = document.getElementById('logout');
+			const fetchBtn = document.getElementById('fetch');
+
+			function log(msg, data = null) {
+				console.log(msg, data || '');
+				const text = data && typeof data === 'object' ? JSON.stringify(data, null, 2) : (data || '');
+				output.textContent = `[${new Date().toLocaleTimeString()}] ${msg}${text ? '\n' + text : ''}`;
+			}
+
+			loginBtn.addEventListener('click', async () => {
+				log('Simulating login...');
+				try {
+					// In a real app, you would pass actual credentials
+					// This will use the baseURL from astro.config.mjs
+					const response = await api.login({ username: 'test', password: 'password' });
+					log('Login response:', response);
+				} catch (e) {
+					log('Login error (expected as we use example.com):', e.message);
+				}
+			});
+
+			logoutBtn.addEventListener('click', async () => {
+				log('Logging out...');
+				await api.logout();
+				log('Logged out.');
+			});
+
+			fetchBtn.addEventListener('click', async () => {
+				log('Fetching protected data...');
+				try {
+					const response = await api.get('/me');
+					log('Fetch response:', response);
+				} catch (e) {
+					log('Fetch error (expected):', e.message);
+				}
+			});
+		</script>
+	</body>
+</html>

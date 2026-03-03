@@ -1,6 +1,6 @@
 {
   "name": "astro-tokenkit",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "A powerful API client for Astro with automatic token rotation, session management, and seamless context integration.",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -44,6 +44,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "bench": "vitest bench run bench/",
+    "playground": "cd playground && npm install && npm run dev",
     "prepublishOnly": "npm run clean && npm run build && npm run types:bundle",
     "prepare": "npm run prepublishOnly"
   },
@@ -51,6 +52,7 @@
     "astro": "^4.0.0 || ^5.0.0"
   },
   "devDependencies": {
+    "astro": "^5.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^20.11.0",

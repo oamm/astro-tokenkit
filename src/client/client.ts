@@ -187,6 +187,8 @@ export class APIClient {
         ctx: TokenKitContext,
         attempt: number
     ): Promise<APIResponse<T>> {
+        const method = config.method.toUpperCase();
+
         // Ensure valid session (if auth is enabled)
         if (this.tokenManager && !config.skipAuth) {
             await this.tokenManager.ensure(ctx, config.auth, config.headers);
@@ -196,18 +198,24 @@ export class APIClient {
         const fullURL = this.buildURL(config.url, config.params);
 
         // Build headers
-        const headers = this.buildHeaders(config, ctx, fullURL);
+        const headers = this.buildHeaders(config, ctx, fullURL) as Record<string, string>;
 
         // Build request init
         const init: RequestInit = {
-            method: config.method,
+            method,
             headers,
             signal: config.signal,
         };
 
-        // Add body for non-GET requests
-        if (config.data && config.method !== 'GET') {
+        // Add body for appropriate methods
+        const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
+        if (config.data && !methodsWithNoBody.includes(method)) {
             init.body = JSON.stringify(config.data);
+
+            // Add Content-Type if not already present
+            if (!headers['Content-Type'] && !headers['content-type']) {
+                headers['Content-Type'] = 'application/json';
+            }
         }
 
         // Apply request interceptors
@@ -345,7 +353,6 @@ export class APIClient {
      */
     private buildHeaders(config: RequestConfig, ctx: TokenKitContext, targetURL: string): HeadersInit {
         const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
             ...this.config.headers,
             ...config.headers,
         };
