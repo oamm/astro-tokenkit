@@ -19,6 +19,7 @@ import {calculateDelay, shouldRetry, sleep} from '../utils/retry';
 import {getConfig, getTokenManager} from '../config';
 import {createMiddleware} from '../middleware';
 import {safeFetch} from '../utils/fetch';
+import {logger} from '../utils/logger';
 
 /**
  * API Client
@@ -72,11 +73,12 @@ export class APIClient {
             this._lastUsedAuth !== config.auth || 
             this._lastUsedBaseURL !== config.baseURL) {
             
-            // Merge client-level fetch and SSL settings into auth config
+            // Merge client-level fetch, SSL and debug settings into auth config
             const authConfig: AuthConfig = {
                 ...config.auth,
                 fetch: config.auth.fetch ?? config.fetch,
                 dangerouslyIgnoreCertificateErrors: config.auth.dangerouslyIgnoreCertificateErrors ?? config.dangerouslyIgnoreCertificateErrors,
+                debug: config.auth.debug ?? config.debug,
             };
             
             this._localTokenManager = new TokenManager(authConfig, config.baseURL);
@@ -188,9 +190,11 @@ export class APIClient {
         attempt: number
     ): Promise<APIResponse<T>> {
         const method = config.method.toUpperCase();
+        const debug = this.config.debug;
 
         // Ensure valid session (if auth is enabled)
         if (this.tokenManager && !config.skipAuth) {
+            logger.debug(`[TokenKit] Ensuring valid session for ${method} ${config.url}`, !!debug);
             await this.tokenManager.ensure(ctx, config.auth, config.headers);
         }
 
@@ -241,12 +245,15 @@ export class APIClient {
 
             // Handle 401 (try refresh and retry once)
             if (response.status === 401 && this.tokenManager && !config.skipAuth && attempt === 1) {
+                logger.debug('[TokenKit] Received 401, attempting force refresh and retry...', !!debug);
                 // Clear and try fresh session (force refresh)
                 const session = await this.tokenManager.ensure(ctx, config.auth, config.headers, true);
                 if (session) {
+                    logger.debug('[TokenKit] Force refresh successful, retrying request...', !!debug);
                     // Retry with new token
                     return this.executeRequest<T>(config, ctx, attempt + 1);
                 }
+                logger.debug('[TokenKit] Force refresh failed or returned no session', !!debug);
             }
 
             // Parse response

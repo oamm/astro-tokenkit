@@ -4,13 +4,13 @@ import { getConfig } from '../config';
  * Logger utility that respects the debug flag in the configuration
  */
 export const logger = {
-    debug: (message: string, ...args: any[]) => {
-        if (getConfig().debug) {
+    debug: (message: string, force?: boolean, ...args: any[]) => {
+        if (force || getConfig().debug) {
             console.debug(message, ...args);
         }
     },
-    info: (message: string, ...args: any[]) => {
-        if (getConfig().debug) {
+    info: (message: string, force?: boolean, ...args: any[]) => {
+        if (force || getConfig().debug) {
             console.log(message, ...args);
         }
     },

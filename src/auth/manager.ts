@@ -136,10 +136,25 @@ export class TokenManager {
      * Perform token refresh
      */
     async refresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, headers?: Record<string, string>): Promise<TokenBundle | null> {
+        logger.debug('[TokenKit] Starting token refresh', !!this.config.debug);
         try {
-            return await this.performRefresh(ctx, refreshToken, options, headers);
-        } catch (error) {
-            clearTokens(ctx, this.config.cookies);
+            const bundle = await this.performRefresh(ctx, refreshToken, options, headers);
+            if (bundle) {
+                if (this.config.onRefresh) {
+                    await this.config.onRefresh(bundle, ctx);
+                }
+            } else {
+                logger.debug('[TokenKit] Token refresh returned no bundle (invalid or expired)', !!this.config.debug);
+                if (this.config.onRefreshError) {
+                    await this.config.onRefreshError(new AuthError('Refresh token invalid or expired', 401), ctx);
+                }
+            }
+            return bundle;
+        } catch (error: any) {
+            logger.debug(`[TokenKit] Token refresh failed: ${error.message}`, !!this.config.debug);
+            if (this.config.onRefreshError) {
+                await this.config.onRefreshError(error, ctx);
+            }
             throw error;
         }
     }
@@ -230,17 +245,23 @@ export class TokenManager {
 
         // No tokens
         if (!tokens.accessToken || !tokens.refreshToken || !tokens.expiresAt) {
+            logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
             return null;
         }
 
         // Token expired or force refresh
-        if (force || isExpired(tokens.expiresAt, now, this.config.policy)) {
+        const expired = isExpired(tokens.expiresAt, now, this.config.policy);
+        if (force || expired) {
+            logger.debug(`[TokenKit] Token ${force ? 'force refresh' : 'expired'}, refreshing...`, !!this.config.debug);
             const flightKey = this.createFlightKey(tokens.refreshToken);
             const bundle = await this.singleFlight.execute(flightKey, () =>
                 this.refresh(ctx, tokens.refreshToken!, options, headers)
             );
 
-            if (!bundle) return null;
+            if (!bundle) {
+                logger.debug('[TokenKit] Refresh returned no bundle, session lost', !!this.config.debug);
+                return null;
+            }
 
             // Ensure tokens are stored in the current context (in case of shared flight)
             storeTokens(ctx, bundle, this.config.cookies);
@@ -255,24 +276,31 @@ export class TokenManager {
 
         // Proactive refresh
         if (shouldRefresh(tokens.expiresAt, now, tokens.lastRefreshAt, this.config.policy)) {
+            logger.debug('[TokenKit] Token near expiration, performing proactive refresh', !!this.config.debug);
             const flightKey = this.createFlightKey(tokens.refreshToken);
-            const bundle = await this.singleFlight.execute(flightKey, () =>
-                this.refresh(ctx, tokens.refreshToken!, options, headers)
-            );
 
-            if (bundle) {
-                // Ensure tokens are stored in the current context (in case of shared flight)
-                storeTokens(ctx, bundle, this.config.cookies);
+            try {
+                const bundle = await this.singleFlight.execute(flightKey, () =>
+                    this.refresh(ctx, tokens.refreshToken!, options, headers)
+                );
 
-                return {
-                    accessToken: bundle.accessToken,
-                    expiresAt: bundle.accessExpiresAt,
-                    tokenType: bundle.tokenType,
-                    payload: bundle.sessionPayload ?? parseJWTPayload(bundle.accessToken) ?? undefined,
-                };
+                if (bundle) {
+                    logger.debug('[TokenKit] Proactive refresh successful', !!this.config.debug);
+                    // Ensure tokens are stored in the current context (in case of shared flight)
+                    storeTokens(ctx, bundle, this.config.cookies);
+
+                    return {
+                        accessToken: bundle.accessToken,
+                        expiresAt: bundle.accessExpiresAt,
+                        tokenType: bundle.tokenType,
+                        payload: bundle.sessionPayload ?? parseJWTPayload(bundle.accessToken) ?? undefined,
+                    };
+                }
+            } catch (error) {
+                logger.debug(`[TokenKit] Proactive refresh failed: ${(error as Error).message}. Continuing with current token.`, !!this.config.debug);
             }
 
-            // Refresh failed, check if tokens still exist
+            // Refresh failed or returned no bundle, check if tokens still exist
             const currentTokens = retrieveTokens(ctx, this.config.cookies);
             if (!currentTokens.accessToken) {
                 return null;
@@ -315,7 +343,7 @@ export class TokenManager {
                 }, this.config);
             } catch (error) {
                 // Ignore logout endpoint errors
-                logger.debug('[TokenKit] Logout endpoint failed:', error);
+                logger.debug('[TokenKit] Logout endpoint failed:', !!this.config.debug, error);
             } finally {
                 clearTimeout(timeoutId);
             }

@@ -120,6 +120,16 @@ export interface LoginOptions extends AuthOptions {
 }
 
 /**
+ * OnRefresh callback
+ */
+export type OnRefreshCallback = (bundle: TokenBundle, ctx: TokenKitContext) => void | Promise<void>;
+
+/**
+ * OnRefreshError callback
+ */
+export type OnRefreshErrorCallback = (error: AuthError, ctx: TokenKitContext) => void | Promise<void>;
+
+/**
  * Auth configuration
  */
 export interface AuthConfig {
@@ -170,6 +180,15 @@ export interface AuthConfig {
 
     /** Dangerously ignore certificate errors (bypass SSL validation) */
     dangerouslyIgnoreCertificateErrors?: boolean;
+
+    /** Enable debug logging for auth operations */
+    debug?: boolean;
+
+    /** Callback after successful refresh */
+    onRefresh?: OnRefreshCallback;
+
+    /** Callback after failed refresh */
+    onRefreshError?: OnRefreshErrorCallback;
 }
 
 /**

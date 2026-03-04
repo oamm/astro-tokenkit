@@ -55,7 +55,7 @@ describe('TokenManager Error Handling', () => {
             expect(storage.clearTokens).toHaveBeenCalledWith(mockCtx, config.cookies);
         });
 
-        it('should throw AuthError and clear tokens on other failed refresh', async () => {
+        it('should throw AuthError but NOT clear tokens on other failed refresh (e.g. 500)', async () => {
             global.fetch = vi.fn().mockResolvedValue({
                 ok: false,
                 status: 500,
@@ -65,10 +65,10 @@ describe('TokenManager Error Handling', () => {
             await expect(manager.refresh(mockCtx, 'old-token'))
                 .rejects.toThrow(AuthError);
             
-            expect(storage.clearTokens).toHaveBeenCalledWith(mockCtx, config.cookies);
+            expect(storage.clearTokens).not.toHaveBeenCalled();
         });
 
-        it('should throw AuthError and clear tokens on invalid bundle', async () => {
+        it('should throw AuthError but NOT clear tokens on invalid bundle', async () => {
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
                 json: () => Promise.resolve({ something: 'invalid' }),
@@ -80,7 +80,7 @@ describe('TokenManager Error Handling', () => {
             await expect(manager.refresh(mockCtx, 'old-token'))
                 .rejects.toThrow();
             
-            expect(storage.clearTokens).toHaveBeenCalledWith(mockCtx, config.cookies);
+            expect(storage.clearTokens).not.toHaveBeenCalled();
         });
     });
 });

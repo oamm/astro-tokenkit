@@ -72,7 +72,7 @@ export function tokenKit(config: TokenKitConfig): AstroIntegration {
                 // Always inject the client-side script for idle monitoring
                 injectScript('page', `import 'astro-tokenkit/client-init';`);
 
-                logger.debug('[TokenKit] Integration initialized');
+                logger.debug('[TokenKit] Integration initialized', !!config.debug);
             },
         },
     };

@@ -28,7 +28,7 @@ export function createMiddleware(): MiddlewareHandler {
                 contextStrategy = 'custom (external AsyncLocalStorage)';
             }
 
-            logger.debug(`[TokenKit] Middleware initialized (auth: ${authStatus}, context: ${contextStrategy})`);
+            logger.debug(`[TokenKit] Middleware initialized (auth: ${authStatus}, context: ${contextStrategy})`, !!config.debug);
             globalStorage[LOGGED_KEY] = true;
         }
 
@@ -40,7 +40,7 @@ export function createMiddleware(): MiddlewareHandler {
                     await tokenManager.ensure(ctx);
                 } catch (error: any) {
                     // Log only the message to avoid leaking sensitive data in the error object
-                    logger.debug('[TokenKit] Automatic token rotation failed:', error.message || error);
+                    logger.debug('[TokenKit] Automatic token rotation failed:', !!config.debug, error.message || error);
                 }
             }
             return next();
