@@ -143,11 +143,12 @@ const specializedClient = createClient({
 
 Astro TokenKit automatically monitors user inactivity and closes the session across all open tabs. This feature uses `BroadcastChannel` to synchronize activity and logout events.
 
-**Important:** When using the Astro integration, the `onIdle` function cannot be passed in `astro.config.mjs` because it is not serializable. Instead, listen for the `tk:idle` event on the client.
+**Important:** When using the Astro integration, the `onIdle` function cannot be passed in `astro.config.mjs` because it is not serializable. Instead, you can pass the name of a global function as a string, or listen for the `tk:idle` event on the client.
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `timeout` | `number` | **Required.** Inactivity timeout in seconds. |
+| `onIdle` | `Function \| string` | Optional callback when idle timeout is reached. Can be a function or the name of a global function (string). |
 | `autoLogout`| `boolean` | Whether to automatically trigger logout by calling the configured logout endpoint (default: `true`). |
 | `reload` | `boolean` | Whether to reload the page after automatic logout (default: `true`). |
 | `activeTabOnly` | `boolean` | Whether to track activity only on the active tab to save CPU/memory (default: `true`). |

@@ -21,11 +21,23 @@ export class IdleManager {
     constructor(config: IdleConfig) {
         this.config = config;
         this.timeout = config.timeout;
-        this.onIdle = config.onIdle || (() => {});
         this.activeTabOnly = config.activeTabOnly ?? true;
         this.expiredTimeKey = '_tk_idle_expires';
         this.eventHandler = this.reportActivity.bind(this);
         this.isIdle = false;
+
+        const onIdleProp = config.onIdle;
+        if (typeof onIdleProp === 'function') {
+            this.onIdle = onIdleProp;
+        } else if (typeof onIdleProp === 'string') {
+            this.onIdle = () => {
+                if (typeof window !== 'undefined' && typeof (window as any)[onIdleProp] === 'function') {
+                    (window as any)[onIdleProp]();
+                }
+            };
+        } else {
+            this.onIdle = () => {};
+        }
 
         if (typeof window === 'undefined') return;
 

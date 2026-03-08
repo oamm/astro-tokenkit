@@ -10,7 +10,8 @@ if (typeof window !== 'undefined') {
     if (config.idle && config.idle.timeout > 0) {
         new IdleManager({
             ...config.idle,
-            onIdle: () => {
+            onIdle: config.idle.onIdle || (() => {
+                // Default implementation: auto logout and reload
                 // Note: IdleManager dispatches 'tk:idle' automatically
                 if (config.idle.autoLogout !== false && config.auth?.logout) {
                     const logoutURL = config.auth.logout.startsWith('http') 
@@ -18,15 +19,14 @@ if (typeof window !== 'undefined') {
                         : (config.baseURL || '') + config.auth.logout;
                     
                     fetch(logoutURL, { 
-                        method: 'POST', 
-                        credentials: 'include' 
+                        method: 'POST'
                     }).finally(() => {
                         if (config.idle.reload !== false) {
                             window.location.reload();
                         }
                     });
                 }
-            }
+            })
         });
     }
 }

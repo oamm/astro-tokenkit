@@ -239,10 +239,13 @@ export interface IdleConfig {
     timeout: number;
     /** 
      * Callback when idle timeout is reached.
-     * NOTE: This function is only used if you manually initialize IdleManager.
-     * If using the Astro integration, use window.addEventListener('tk:idle', ...) instead.
+     * Can be a function OR a string (name of a global function on window).
+     * 
+     * NOTE: If using the Astro integration, passing a function here won't work 
+     * in astro.config.mjs because it's not serializable. Use a string name 
+     * of a global function or window.addEventListener('tk:idle', ...) instead.
      */
-    onIdle?: () => void;
+    onIdle?: (() => void) | string;
     /** Whether to automatically logout on idle (default: true) */
     autoLogout?: boolean;
     /** Whether to reload the page after automatic logout (default: true) */

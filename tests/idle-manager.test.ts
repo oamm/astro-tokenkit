@@ -141,4 +141,17 @@ describe('IdleManager', () => {
         expect((call![0] as any).detail).toEqual(config);
         manager.cleanup();
     });
+
+    it('should call global function when onIdle is a string', () => {
+        const globalHandler = vi.fn();
+        (window as any).myCustomHandler = globalHandler;
+        
+        const manager = new IdleManager({ timeout: 1, onIdle: 'myCustomHandler' });
+        
+        vi.advanceTimersByTime(2000);
+        
+        expect(globalHandler).toHaveBeenCalled();
+        delete (window as any).myCustomHandler;
+        manager.cleanup();
+    });
 });
