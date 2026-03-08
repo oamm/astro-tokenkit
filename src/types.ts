@@ -245,6 +245,8 @@ export interface IdleConfig {
     onIdle?: () => void;
     /** Whether to automatically logout on idle (default: true) */
     autoLogout?: boolean;
+    /** Whether to reload the page after automatic logout (default: true) */
+    reload?: boolean;
     /** Whether to monitor activity only on the active tab (default: true) */
     activeTabOnly?: boolean;
     /** 

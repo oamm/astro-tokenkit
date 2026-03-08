@@ -149,6 +149,7 @@ Astro TokenKit automatically monitors user inactivity and closes the session acr
 | :--- | :--- | :--- |
 | `timeout` | `number` | **Required.** Inactivity timeout in seconds. |
 | `autoLogout`| `boolean` | Whether to automatically trigger logout by calling the configured logout endpoint (default: `true`). |
+| `reload` | `boolean` | Whether to reload the page after automatic logout (default: `true`). |
 | `activeTabOnly` | `boolean` | Whether to track activity only on the active tab to save CPU/memory (default: `true`). |
 | `alert` | `any` | Custom data to be passed to the `tk:idle` event. Ideal for configuring SweetAlert options. |
 

@@ -21,7 +21,9 @@ if (typeof window !== 'undefined') {
                         method: 'POST', 
                         credentials: 'include' 
                     }).finally(() => {
-                        window.location.reload();
+                        if (config.idle.reload !== false) {
+                            window.location.reload();
+                        }
                     });
                 }
             }
