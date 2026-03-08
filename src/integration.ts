@@ -43,6 +43,10 @@ import { logger } from './utils/logger';
 export function tokenKit(config: TokenKitConfig): AstroIntegration {
     setConfig(config);
     
+    if (config.idle?.onIdle && typeof config.idle.onIdle === 'function') {
+        logger.warn('[TokenKit] Passing a function to "idle.onIdle" in astro.config.mjs is not supported because it is not serializable. Use a string name of a global function or window.addEventListener("tk:idle", ...) instead.');
+    }
+
     // Create a serializable version of the config for the runtime
     const serializableConfig = JSON.parse(JSON.stringify(config, (key, value) => {
         if (typeof value === 'function') return undefined;

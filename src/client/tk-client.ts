@@ -12,14 +12,14 @@ if (typeof window !== 'undefined') {
             ...config.idle,
             onIdle: config.idle.onIdle || (() => {
                 // Default implementation: auto logout and reload
-                // Note: IdleManager dispatches 'tk:idle' automatically
                 if (config.idle.autoLogout !== false && config.auth?.logout) {
                     const logoutURL = config.auth.logout.startsWith('http') 
                         ? config.auth.logout 
                         : (config.baseURL || '') + config.auth.logout;
                     
                     fetch(logoutURL, { 
-                        method: 'POST'
+                        method: 'POST',
+                        credentials: 'include'
                     }).finally(() => {
                         if (config.idle.reload !== false) {
                             window.location.reload();

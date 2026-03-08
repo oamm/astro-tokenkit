@@ -142,6 +142,7 @@ describe('IdleManager', () => {
         manager.cleanup();
     });
 
+
     it('should call global function when onIdle is a string', () => {
         const globalHandler = vi.fn();
         (window as any).myCustomHandler = globalHandler;

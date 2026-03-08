@@ -182,6 +182,25 @@ tokenKit({
 </script>
 ```
 
+#### Overriding Auto-Logout Behavior
+
+By default, TokenKit automatically calls your logout endpoint and reloads the page. You can override this behavior by providing an `onIdle` callback (function or string) in your configuration.
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  integrations: [
+    tokenKit({
+      idle: {
+        timeout: 60 * 15,
+        // Disables default logout/reload and runs this instead
+        onIdle: 'myCustomLogout'
+      }
+    })
+  ]
+});
+```
+
 ### Login Options
 
 | Property | Type | Description |
