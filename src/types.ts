@@ -253,6 +253,11 @@ export interface IdleConfig {
     /** Whether to monitor activity only on the active tab (default: true) */
     activeTabOnly?: boolean;
     /** 
+     * Paths to exclude from idle monitoring.
+     * If the current path matches any of these, idle monitoring will be disabled.
+     */
+    excludePaths?: string[];
+    /** 
      * Custom data to pass to the 'tk:idle' event. 
      * Ideal for configuring client-side alerts (e.g. SweetAlert).
      */

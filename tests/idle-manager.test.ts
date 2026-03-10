@@ -37,6 +37,7 @@ describe('IdleManager', () => {
             addEventListener: vi.fn(),
             removeEventListener: vi.fn(),
             dispatchEvent: vi.fn(),
+            location: { pathname: '/' },
         } as any;
         (global as any).CustomEvent = class {
             constructor(type: string, options: any) {
@@ -153,6 +154,37 @@ describe('IdleManager', () => {
         
         expect(globalHandler).toHaveBeenCalled();
         delete (window as any).myCustomHandler;
+        manager.cleanup();
+    });
+
+    it('should not initialize on excluded paths', () => {
+        (window.location as any).pathname = '/login';
+        const manager = new IdleManager({ 
+            timeout: 60, 
+            onIdle,
+            excludePaths: ['/login']
+        });
+        
+        expect((global as any).localStorage.setItem).not.toHaveBeenCalledWith('_tk_idle_expires', expect.any(String));
+        manager.cleanup();
+    });
+
+    it('should not trigger onIdle if path becomes excluded (SPA navigation)', () => {
+        (window.location as any).pathname = '/dashboard';
+        const manager = new IdleManager({ 
+            timeout: 1, 
+            onIdle,
+            excludePaths: ['/login']
+        });
+        
+        expect((global as any).localStorage.setItem).toHaveBeenCalledWith('_tk_idle_expires', expect.any(String));
+        
+        // Simulate navigation to login page
+        (window.location as any).pathname = '/login';
+        
+        vi.advanceTimersByTime(2000);
+        
+        expect(onIdle).not.toHaveBeenCalled();
         manager.cleanup();
     });
 });

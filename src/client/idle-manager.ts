@@ -60,6 +60,10 @@ export class IdleManager {
     private start() {
         if (typeof window === 'undefined') return;
 
+        if (this.isExcluded()) {
+            return;
+        }
+
         this.updateExpiredTimeLocal();
         this.setupEventListeners();
         this.loop();
@@ -142,6 +146,12 @@ export class IdleManager {
 
     private triggerIdle() {
         if (this.isIdle) return;
+
+        if (this.isExcluded()) {
+            this.updateExpiredTimeLocal();
+            return;
+        }
+
         this.isIdle = true;
 
         if (typeof window !== 'undefined') {
@@ -149,6 +159,16 @@ export class IdleManager {
         }
         this.cleanup();
         this.onIdle();
+    }
+
+    private isExcluded(): boolean {
+        if (this.config.excludePaths && this.config.excludePaths.length > 0) {
+            if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname;
+                return this.config.excludePaths.some(path => currentPath.startsWith(path));
+            }
+        }
+        return false;
     }
 
     public cleanup() {
