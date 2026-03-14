@@ -13,19 +13,42 @@ import { logger } from '../utils/logger';
  */
 class SingleFlight {
     private inFlight = new Map<string, Promise<TokenBundle | null>>();
+    private recent = new Map<string, { bundle: TokenBundle | null, time: number }>();
+    private readonly GRACE_PERIOD = 5000; // 5 seconds grace period for race conditions
 
     async execute(
         key: string,
         fn: () => Promise<TokenBundle | null>
     ): Promise<TokenBundle | null> {
+        // 1. Check in-flight
         const existing = this.inFlight.get(key);
         if (existing) return existing;
 
+        // 2. Check recent (grace period)
+        const cached = this.recent.get(key);
+        if (cached && (Date.now() - cached.time < this.GRACE_PERIOD)) {
+            return cached.bundle;
+        }
+
+        // 3. Execute new flight
         const promise = (async () => {
             try {
-                return await fn();
+                const bundle = await fn();
+                // Store in recent on success
+                if (bundle) {
+                    this.recent.set(key, { bundle, time: Date.now() });
+                }
+                return bundle;
             } finally {
                 this.inFlight.delete(key);
+                
+                // Cleanup old entries
+                const now = Date.now();
+                for (const [k, v] of this.recent.entries()) {
+                    if (now - v.time > this.GRACE_PERIOD) {
+                        this.recent.delete(k);
+                    }
+                }
             }
         })();
 
@@ -136,27 +159,30 @@ export class TokenManager {
      * Perform token refresh
      */
     async refresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, headers?: Record<string, string>): Promise<TokenBundle | null> {
-        logger.debug('[TokenKit] Starting token refresh', !!this.config.debug);
-        try {
-            const bundle = await this.performRefresh(ctx, refreshToken, options, headers);
-            if (bundle) {
-                if (this.config.onRefresh) {
-                    await this.config.onRefresh(bundle, ctx);
+        const flightKey = this.createFlightKey(refreshToken);
+        return this.singleFlight.execute(flightKey, async () => {
+            logger.debug('[TokenKit] Starting token refresh', !!this.config.debug);
+            try {
+                const bundle = await this.performRefresh(ctx, refreshToken, options, headers);
+                if (bundle) {
+                    if (this.config.onRefresh) {
+                        await this.config.onRefresh(bundle, ctx);
+                    }
+                } else {
+                    logger.debug('[TokenKit] Token refresh returned no bundle (invalid or expired)', !!this.config.debug);
+                    if (this.config.onRefreshError) {
+                        await this.config.onRefreshError(new AuthError('Refresh token invalid or expired', 401), ctx);
+                    }
                 }
-            } else {
-                logger.debug('[TokenKit] Token refresh returned no bundle (invalid or expired)', !!this.config.debug);
+                return bundle;
+            } catch (error: any) {
+                logger.debug(`[TokenKit] Token refresh failed: ${error.message}`, !!this.config.debug);
                 if (this.config.onRefreshError) {
-                    await this.config.onRefreshError(new AuthError('Refresh token invalid or expired', 401), ctx);
+                    await this.config.onRefreshError(error, ctx);
                 }
+                throw error;
             }
-            return bundle;
-        } catch (error: any) {
-            logger.debug(`[TokenKit] Token refresh failed: ${error.message}`, !!this.config.debug);
-            if (this.config.onRefreshError) {
-                await this.config.onRefreshError(error, ctx);
-            }
-            throw error;
-        }
+        });
     }
 
     /**
@@ -205,8 +231,8 @@ export class TokenManager {
         }
 
         if (!response.ok) {
-            // 401/403 = invalid refresh token
-            if (response.status === 401 || response.status === 403) {
+            // 400 (Bad Request), 401 (Unauthorized) or 403 (Forbidden) = invalid refresh token
+            if (response.status === 400 || response.status === 401 || response.status === 403) {
                 clearTokens(ctx, this.config.cookies);
                 return null;
             }
@@ -253,10 +279,7 @@ export class TokenManager {
         const expired = isExpired(tokens.expiresAt, now, this.config.policy);
         if (force || expired) {
             logger.debug(`[TokenKit] Token ${force ? 'force refresh' : 'expired'}, refreshing...`, !!this.config.debug);
-            const flightKey = this.createFlightKey(tokens.refreshToken);
-            const bundle = await this.singleFlight.execute(flightKey, () =>
-                this.refresh(ctx, tokens.refreshToken!, options, headers)
-            );
+            const bundle = await this.refresh(ctx, tokens.refreshToken!, options, headers);
 
             if (!bundle) {
                 logger.debug('[TokenKit] Refresh returned no bundle, session lost', !!this.config.debug);
@@ -277,12 +300,9 @@ export class TokenManager {
         // Proactive refresh
         if (shouldRefresh(tokens.expiresAt, now, tokens.lastRefreshAt, this.config.policy)) {
             logger.debug('[TokenKit] Token near expiration, performing proactive refresh', !!this.config.debug);
-            const flightKey = this.createFlightKey(tokens.refreshToken);
 
             try {
-                const bundle = await this.singleFlight.execute(flightKey, () =>
-                    this.refresh(ctx, tokens.refreshToken!, options, headers)
-                );
+                const bundle = await this.refresh(ctx, tokens.refreshToken!, options, headers);
 
                 if (bundle) {
                     logger.debug('[TokenKit] Proactive refresh successful', !!this.config.debug);
