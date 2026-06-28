@@ -15,7 +15,9 @@ describe('IdleManager', () => {
             onmessage: null,
             close: vi.fn(),
         };
-        (global as any).BroadcastChannel = vi.fn().mockImplementation(() => mockChannel);
+        (global as any).BroadcastChannel = vi.fn(function BroadcastChannel() {
+            return mockChannel;
+        });
 
         // Mock localStorage
         const storage: Record<string, string> = {};

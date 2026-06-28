@@ -189,38 +189,7 @@ export class APIClient {
         ctx: TokenKitContext,
         attempt: number
     ): Promise<APIResponse<T>> {
-        const method = config.method.toUpperCase();
         const debug = this.config.debug;
-
-        // Ensure valid session (if auth is enabled)
-        if (this.tokenManager && !config.skipAuth) {
-            logger.debug(`[TokenKit] Ensuring valid session for ${method} ${config.url}`, !!debug);
-            await this.tokenManager.ensure(ctx, config.auth, config.headers);
-        }
-
-        // Build full URL
-        const fullURL = this.buildURL(config.url, config.params);
-
-        // Build headers
-        const headers = this.buildHeaders(config, ctx, fullURL) as Record<string, string>;
-
-        // Build request init
-        const init: RequestInit = {
-            method,
-            headers,
-            signal: config.signal,
-        };
-
-        // Add body for appropriate methods
-        const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
-        if (config.data && !methodsWithNoBody.includes(method)) {
-            init.body = JSON.stringify(config.data);
-
-            // Add Content-Type if not already present
-            if (!headers['Content-Type'] && !headers['content-type']) {
-                headers['Content-Type'] = 'application/json';
-            }
-        }
 
         // Apply request interceptors
         let requestConfig = { ...config };
@@ -230,8 +199,40 @@ export class APIClient {
             }
         }
 
+        const method = requestConfig.method.toUpperCase();
+
+        // Ensure valid session (if auth is enabled)
+        if (this.tokenManager && !requestConfig.skipAuth) {
+            logger.debug(`[TokenKit] Ensuring valid session for ${method} ${requestConfig.url}`, !!debug);
+            await this.tokenManager.ensure(ctx, requestConfig.auth, requestConfig.headers);
+        }
+
+        // Build full URL
+        const fullURL = this.buildURL(requestConfig.url, requestConfig.params);
+
+        // Build headers
+        const headers = this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
+
+        // Build request init
+        const init: RequestInit = {
+            method,
+            headers,
+            signal: requestConfig.signal,
+        };
+
+        // Add body for appropriate methods
+        const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
+        if (requestConfig.data && !methodsWithNoBody.includes(method)) {
+            init.body = JSON.stringify(requestConfig.data);
+
+            // Add Content-Type if not already present
+            if (!headers['Content-Type'] && !headers['content-type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+        }
+
         // Execute fetch with timeout
-        const timeout = config.timeout ?? this.config.timeout ?? 30000;
+        const timeout = requestConfig.timeout ?? this.config.timeout ?? 30000;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -244,20 +245,20 @@ export class APIClient {
             clearTimeout(timeoutId);
 
             // Handle 401 (try refresh and retry once)
-            if (response.status === 401 && this.tokenManager && !config.skipAuth && attempt === 1) {
+            if (response.status === 401 && this.tokenManager && !requestConfig.skipAuth && attempt === 1) {
                 logger.debug('[TokenKit] Received 401, attempting force refresh and retry...', !!debug);
                 // Clear and try fresh session (force refresh)
-                const session = await this.tokenManager.ensure(ctx, config.auth, config.headers, true);
+                const session = await this.tokenManager.ensure(ctx, requestConfig.auth, requestConfig.headers, true);
                 if (session) {
                     logger.debug('[TokenKit] Force refresh successful, retrying request...', !!debug);
-                    // Retry with new token
+                    // Retry with new token (re-apply interceptors for the new request)
                     return this.executeRequest<T>(config, ctx, attempt + 1);
                 }
                 logger.debug('[TokenKit] Force refresh failed or returned no session', !!debug);
             }
 
             // Parse response
-            const apiResponse = await this.parseResponse<T>(response, fullURL);
+            const apiResponse = await this.parseResponse<T>(response, fullURL, requestConfig);
 
             // Apply response interceptors
             if (this.config.interceptors?.response) {
@@ -295,7 +296,7 @@ export class APIClient {
     /**
      * Parse response
      */
-    private async parseResponse<T>(response: Response, url: string): Promise<APIResponse<T>> {
+    private async parseResponse<T>(response: Response, url: string, request: RequestConfig): Promise<APIResponse<T>> {
         let data: T;
 
         // Try to parse JSON
@@ -316,14 +317,16 @@ export class APIClient {
                 throw new AuthError(
                     `Authentication failed: ${response.status} ${response.statusText}`,
                     response.status,
-                    data
+                    data,
+                    request
                 );
             }
 
             throw new APIError(
                 `Request failed: ${response.status} ${response.statusText}`,
                 response.status,
-                data
+                data,
+                request
             );
         }
 
@@ -348,7 +351,12 @@ export class APIClient {
         const urlObj = new URL(fullURL);
         Object.entries(params).forEach(([key, value]) => {
             if (value !== undefined && value !== null) {
-                urlObj.searchParams.append(key, String(value));
+                if (Array.isArray(value)) {
+                    urlObj.searchParams.delete(key);
+                    value.forEach(v => urlObj.searchParams.append(key, String(v)));
+                } else {
+                    urlObj.searchParams.set(key, String(value));
+                }
             }
         });
 

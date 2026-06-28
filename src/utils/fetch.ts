@@ -19,8 +19,8 @@ export async function safeFetch(
         try {
             // Try to use undici Agent if available to avoid global process.env changes
             if (!sharedInsecureAgent) {
-                // @ts-ignore
-                const undici = await import('undici').catch(() => null);
+                const loadOptionalModule = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>;
+                const undici = await loadOptionalModule('undici').catch(() => null);
                 if (undici && undici.Agent) {
                     sharedInsecureAgent = new undici.Agent({
                         connect: { rejectUnauthorized: false }
