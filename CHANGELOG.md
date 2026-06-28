@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.28 - 2026-06-28
+
+- Fixed TLS bypass requests by pairing external `undici.fetch` with its own `Agent`, avoiding dispatcher compatibility errors in Node's built-in `fetch`.
+
 ## 1.0.27 - 2026-06-28
 
 - Added Astro 7 peer dependency compatibility (`^7.0.0`).

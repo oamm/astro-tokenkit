@@ -3,6 +3,7 @@
 import type { ClientConfig, AuthConfig } from '../types';
 
 let sharedInsecureAgent: any = null;
+let sharedUndiciFetch: any = null;
 
 /**
  * Perform a fetch request with optional certificate validation bypass
@@ -17,19 +18,24 @@ export async function safeFetch(
 
     if (config.dangerouslyIgnoreCertificateErrors && typeof process !== 'undefined') {
         try {
-            // Try to use undici Agent if available to avoid global process.env changes
-            if (!sharedInsecureAgent) {
+            // Use undici's fetch with undici's Agent. Mixing an external Agent with
+            // Node's built-in fetch can fail when their internal handler contracts differ.
+            if (!config.fetch && (!sharedInsecureAgent || !sharedUndiciFetch)) {
                 const loadOptionalModule = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>;
                 const undici = await loadOptionalModule('undici').catch(() => null);
-                if (undici && undici.Agent) {
+                if (undici && undici.Agent && undici.fetch) {
                     sharedInsecureAgent = new undici.Agent({
                         connect: { rejectUnauthorized: false }
                     });
+                    sharedUndiciFetch = undici.fetch;
                 }
             }
 
-            if (sharedInsecureAgent) {
-                fetchOptions.dispatcher = sharedInsecureAgent;
+            if (!config.fetch && sharedInsecureAgent && sharedUndiciFetch) {
+                return sharedUndiciFetch(url, {
+                    ...fetchOptions,
+                    dispatcher: sharedInsecureAgent
+                });
             } else {
                 // Fallback to global setting (less secure, but only way without undici)
                 if (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
