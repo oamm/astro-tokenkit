@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.29 - 2026-07-02
+
+- Added configurable token storage with opt-in Astro session-backed storage.
+- Added async session/auth helpers for session-backed token reads.
+
 ## 1.0.28 - 2026-06-28
 
 - Fixed TLS bypass requests by pairing external `undici.fetch` with its own `Agent`, avoiding dispatcher compatibility errors in Node's built-in `fetch`.

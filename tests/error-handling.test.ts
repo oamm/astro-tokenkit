@@ -52,7 +52,7 @@ describe('TokenManager Error Handling', () => {
             const result = await manager.refresh(mockCtx, 'old-token');
             
             expect(result).toBeNull();
-            expect(storage.clearTokens).toHaveBeenCalledWith(mockCtx, config.cookies);
+            expect(storage.clearTokens).toHaveBeenCalledWith(mockCtx, config.cookies, undefined);
         });
 
         it('should throw AuthError but NOT clear tokens on other failed refresh (e.g. 500)', async () => {

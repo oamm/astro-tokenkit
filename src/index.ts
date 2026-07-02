@@ -33,6 +33,10 @@ export type {
     LoginOptions,
     OnLoginCallback,
     OnErrorCallback,
+    TokenStorageConfig,
+    TokenStorageRecord,
+    TokenStorageType,
+    TokenSessionProvider,
 } from './types';
 
 // Errors

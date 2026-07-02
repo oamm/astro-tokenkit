@@ -3,7 +3,7 @@
 import {APIResponse, AuthError} from '../types';
 import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
-import { storeTokens, retrieveTokens, clearTokens } from './storage';
+import { storeTokens, retrieveTokens, retrieveCookieTokens, clearTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
 import { safeFetch } from '../utils/fetch';
 import { logger } from '../utils/logger';
@@ -137,8 +137,8 @@ export class TokenManager {
             throw authError;
         }
 
-        // Store in cookies
-        storeTokens(ctx, bundle, this.config.cookies);
+        // Store in the configured backend
+        await this.storeTokens(ctx, bundle);
 
         // Call onLogin callback if provided
         if (options?.onLogin) {
@@ -233,7 +233,7 @@ export class TokenManager {
         if (!response.ok) {
             // 400 (Bad Request), 401 (Unauthorized) or 403 (Forbidden) = invalid refresh token
             if (response.status === 400 || response.status === 401 || response.status === 403) {
-                clearTokens(ctx, this.config.cookies);
+                await this.clearTokens(ctx);
                 return null;
             }
             throw new AuthError(`Refresh failed: ${response.status} ${response.statusText}`, response.status, response);
@@ -257,7 +257,7 @@ export class TokenManager {
         }
 
         // Store new tokens
-        storeTokens(ctx, bundle, this.config.cookies);
+        await this.storeTokens(ctx, bundle);
 
         return bundle;
     }
@@ -267,7 +267,7 @@ export class TokenManager {
      */
     async ensure(ctx: TokenKitContext, options?: AuthOptions, headers?: Record<string, string>, force: boolean = false): Promise<Session | null> {
         const now = Math.floor(Date.now() / 1000);
-        const tokens = retrieveTokens(ctx, this.config.cookies);
+        const tokens = await this.retrieveTokens(ctx);
 
         // No tokens
         if (!tokens.accessToken || !tokens.refreshToken || !tokens.expiresAt) {
@@ -287,7 +287,7 @@ export class TokenManager {
             }
 
             // Ensure tokens are stored in the current context (in case of shared flight)
-            storeTokens(ctx, bundle, this.config.cookies);
+            await this.storeTokens(ctx, bundle);
 
             return {
                 accessToken: bundle.accessToken,
@@ -307,7 +307,7 @@ export class TokenManager {
                 if (bundle) {
                     logger.debug('[TokenKit] Proactive refresh successful', !!this.config.debug);
                     // Ensure tokens are stored in the current context (in case of shared flight)
-                    storeTokens(ctx, bundle, this.config.cookies);
+                    await this.storeTokens(ctx, bundle);
 
                     return {
                         accessToken: bundle.accessToken,
@@ -321,7 +321,7 @@ export class TokenManager {
             }
 
             // Refresh failed or returned no bundle, check if tokens still exist
-            const currentTokens = retrieveTokens(ctx, this.config.cookies);
+            const currentTokens = await this.retrieveTokens(ctx);
             if (!currentTokens.accessToken) {
                 return null;
             }
@@ -348,7 +348,7 @@ export class TokenManager {
 
             try {
                 const url = this.joinURL(this.baseURL, this.config.logout);
-                const session = this.getSession(ctx);
+                const session = await this.getSessionAsync(ctx);
                 const headers: Record<string, string> = {};
 
                 if (session?.accessToken) {
@@ -369,14 +369,32 @@ export class TokenManager {
             }
         }
 
-        clearTokens(ctx, this.config.cookies);
+        await this.clearTokens(ctx);
     }
 
     /**
      * Get current session (no refresh)
      */
     getSession(ctx: TokenKitContext): Session | null {
-        const tokens = retrieveTokens(ctx, this.config.cookies);
+        const tokens = retrieveCookieTokens(ctx, this.config.cookies);
+
+        if (!tokens.accessToken || !tokens.expiresAt) {
+            return null;
+        }
+
+        return {
+            accessToken: tokens.accessToken,
+            expiresAt: tokens.expiresAt,
+            tokenType: tokens.tokenType ?? undefined,
+            payload: parseJWTPayload(tokens.accessToken) ?? undefined,
+        };
+    }
+
+    /**
+     * Get current session (no refresh)
+     */
+    async getSessionAsync(ctx: TokenKitContext): Promise<Session | null> {
+        const tokens = await this.retrieveTokens(ctx);
 
         if (!tokens.accessToken || !tokens.expiresAt) {
             return null;
@@ -394,7 +412,15 @@ export class TokenManager {
      * Check if authenticated
      */
     isAuthenticated(ctx: TokenKitContext): boolean {
-        const tokens = retrieveTokens(ctx, this.config.cookies);
+        const tokens = retrieveCookieTokens(ctx, this.config.cookies);
+        return !!(tokens.accessToken && tokens.refreshToken);
+    }
+
+    /**
+     * Check if authenticated
+     */
+    async isAuthenticatedAsync(ctx: TokenKitContext): Promise<boolean> {
+        const tokens = await this.retrieveTokens(ctx);
         return !!(tokens.accessToken && tokens.refreshToken);
     }
 
@@ -404,6 +430,18 @@ export class TokenManager {
     private createFlightKey(token: string): string {
         // Avoid weak hashing of sensitive tokens
         return `refresh_${token}`;
+    }
+
+    private storeTokens(ctx: TokenKitContext, bundle: TokenBundle): Promise<void> {
+        return storeTokens(ctx, bundle, this.config.cookies, this.config.storage);
+    }
+
+    private retrieveTokens(ctx: TokenKitContext) {
+        return retrieveTokens(ctx, this.config.cookies, this.config.storage);
+    }
+
+    private clearTokens(ctx: TokenKitContext): Promise<void> {
+        return clearTokens(ctx, this.config.cookies, this.config.storage);
     }
 
     /**

@@ -211,7 +211,7 @@ export class APIClient {
         const fullURL = this.buildURL(requestConfig.url, requestConfig.params);
 
         // Build headers
-        const headers = this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
+        const headers = await this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
 
         // Build request init
         const init: RequestInit = {
@@ -366,7 +366,7 @@ export class APIClient {
     /**
      * Build request headers
      */
-    private buildHeaders(config: RequestConfig, ctx: TokenKitContext, targetURL: string): HeadersInit {
+    private async buildHeaders(config: RequestConfig, ctx: TokenKitContext, targetURL: string): Promise<HeadersInit> {
         const headers: Record<string, string> = {
             ...this.config.headers,
             ...config.headers,
@@ -374,7 +374,7 @@ export class APIClient {
 
         // Add auth token if available (only for safe URLs)
         if (this.tokenManager && !config.skipAuth && this.isSafeURL(targetURL)) {
-            const session = this.tokenManager.getSession(ctx);
+            const session = await this.tokenManager.getSessionAsync(ctx);
             if (session?.accessToken) {
                 const injectFn = this.config.auth?.injectToken ?? ((token, type) => `${type ?? 'Bearer'} ${token}`);
                 headers['Authorization'] = injectFn(session.accessToken, session.tokenType);
@@ -433,6 +433,16 @@ export class APIClient {
     }
 
     /**
+     * Check if authenticated
+     */
+    async isAuthenticatedAsync(): Promise<boolean> {
+        if (!this.tokenManager) return false;
+
+        const context = getContextStore();
+        return this.tokenManager.isAuthenticatedAsync(context);
+    }
+
+    /**
      * Get current session
      */
     getSession(): Session | null {
@@ -440,6 +450,16 @@ export class APIClient {
 
         const context = getContextStore();
         return this.tokenManager.getSession(context);
+    }
+
+    /**
+     * Get current session
+     */
+    async getSessionAsync(): Promise<Session | null> {
+        if (!this.tokenManager) return null;
+
+        const context = getContextStore();
+        return this.tokenManager.getSessionAsync(context);
     }
 
 }

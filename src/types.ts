@@ -175,6 +175,9 @@ export interface AuthConfig {
     /** Cookie configuration */
     cookies?: CookieConfig;
 
+    /** Token storage configuration (default: cookie) */
+    storage?: TokenStorageConfig;
+
     /** Custom fetch implementation */
     fetch?: typeof fetch;
 
@@ -215,6 +218,31 @@ export interface CookieConfig {
     domain?: string;
     /** Cookie names prefix */
     prefix?: string;
+}
+
+export type TokenStorageType = 'cookie' | 'session';
+
+export interface TokenStorageRecord {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    lastRefreshAt: number;
+    tokenType?: string;
+}
+
+export interface TokenSessionProvider {
+    get?: (ctx: TokenKitContext, key: string) => TokenStorageRecord | undefined | null | Promise<TokenStorageRecord | undefined | null>;
+    set?: (ctx: TokenKitContext, key: string, value: TokenStorageRecord, options?: { ttl?: number }) => void | Promise<void>;
+    delete?: (ctx: TokenKitContext, key: string) => void | Promise<void>;
+}
+
+export interface TokenStorageConfig {
+    /** Where token data is persisted (default: cookie) */
+    type?: TokenStorageType;
+    /** Session key used when type is session (default: tokenkit) */
+    key?: string;
+    /** Custom session provider. Defaults to ctx.session when available. */
+    provider?: TokenSessionProvider;
 }
 
 /**

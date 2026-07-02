@@ -137,7 +137,42 @@ const specializedClient = createClient({
 | `parseRefresh`| `Function` | Custom parser for refresh response: `(body: any) => TokenBundle`. |
 | `injectToken` | `Function` | Custom token injection: `(token: string, type?: string) => string` (default: Bearer). |
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
+| `storage` | `TokenStorageConfig` | Token storage backend. Use `{ type: 'cookie' }` (default) or `{ type: 'session' }`. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
+
+#### Token Storage
+
+By default, TokenKit stores the access token, refresh token, expiry, and token type as separate HttpOnly cookies. To hide those token values behind Astro's session provider, enable session storage:
+
+```javascript
+tokenKit({
+  baseURL: 'https://api.example.com',
+  auth: {
+    login: '/auth/login',
+    refresh: '/auth/refresh',
+    storage: { type: 'session' }
+  }
+})
+```
+
+Session storage uses `ctx.session.get/set/delete` and writes the token bundle under the `tokenkit` session key. You can customize the key:
+
+```javascript
+storage: { type: 'session', key: 'auth_tokens' }
+```
+
+If you are not using Astro's built-in session provider, pass a custom provider:
+
+```javascript
+storage: {
+  type: 'session',
+  provider: {
+    get: (ctx, key) => ctx.locals.session.get(key),
+    set: (ctx, key, value, options) => ctx.locals.session.set(key, value, options),
+    delete: (ctx, key) => ctx.locals.session.delete(key)
+  }
+}
+```
 
 ### Idle Session Timeout
 

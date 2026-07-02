@@ -1,6 +1,13 @@
 // packages/astro-tokenkit/src/auth/storage.ts
 
-import type { TokenBundle, CookieConfig, TokenKitContext } from '../types';
+import type {
+    TokenBundle,
+    CookieConfig,
+    TokenKitContext,
+    TokenStorageConfig,
+    TokenStorageRecord,
+    TokenSessionProvider
+} from '../types';
 
 /**
  * Cookie names
@@ -41,14 +48,51 @@ export function getCookieOptions(config: CookieConfig = {}) {
     };
 }
 
+function getStorageType(storageConfig?: TokenStorageConfig): 'cookie' | 'session' {
+    return storageConfig?.type ?? 'cookie';
+}
+
+function getSessionKey(cookieConfig: CookieConfig = {}, storageConfig: TokenStorageConfig = {}): string {
+    if (storageConfig.key) return storageConfig.key;
+    return cookieConfig.prefix ? `${cookieConfig.prefix}_tokenkit` : 'tokenkit';
+}
+
+function getSessionProvider(ctx: TokenKitContext, storageConfig: TokenStorageConfig = {}): Required<TokenSessionProvider> | null {
+    const session = storageConfig.provider ?? ctx.session;
+    if (!session?.get || !session?.set || !session?.delete) return null;
+
+    return {
+        get: (readCtx, key) => storageConfig.provider
+            ? session.get(readCtx, key)
+            : session.get(key),
+        set: (writeCtx, key, value, options) => storageConfig.provider
+            ? session.set(writeCtx, key, value, options)
+            : session.set(key, value, options),
+        delete: (deleteCtx, key) => storageConfig.provider
+            ? session.delete(deleteCtx, key)
+            : session.delete(key),
+    };
+}
+
+function bundleToRecord(bundle: TokenBundle, now: number): TokenStorageRecord {
+    return {
+        accessToken: bundle.accessToken,
+        refreshToken: bundle.refreshToken,
+        expiresAt: bundle.accessExpiresAt,
+        lastRefreshAt: now,
+        tokenType: bundle.tokenType,
+    };
+}
+
 /**
- * Store token bundle in cookies
+ * Store token bundle in the configured backend
  */
-export function storeTokens(
+export async function storeTokens(
     ctx: TokenKitContext,
     bundle: TokenBundle,
-    cookieConfig: CookieConfig = {}
-): void {
+    cookieConfig: CookieConfig = {},
+    storageConfig: TokenStorageConfig = {}
+): Promise<void> {
     const names = getCookieNames(cookieConfig.prefix);
     const options = getCookieOptions(cookieConfig);
     const now = Math.floor(Date.now() / 1000);
@@ -58,6 +102,18 @@ export function storeTokens(
     const refreshMaxAge = bundle.refreshExpiresAt
         ? Math.max(0, bundle.refreshExpiresAt - now)
         : 7 * 24 * 60 * 60; // Default 7 days
+
+    if (getStorageType(storageConfig) === 'session') {
+        const provider = getSessionProvider(ctx, storageConfig);
+        if (!provider) {
+            throw new Error('TokenKit session storage requires Astro ctx.session or a custom storage provider');
+        }
+
+        await provider.set(ctx, getSessionKey(cookieConfig, storageConfig), bundleToRecord(bundle, now), {
+            ttl: refreshMaxAge,
+        });
+        return;
+    }
 
     // Set access token
     ctx.cookies.set(names.accessToken, bundle.accessToken, {
@@ -98,9 +154,39 @@ export function storeTokens(
 }
 
 /**
- * Retrieve tokens from cookies
+ * Retrieve tokens from the configured backend
  */
-export function retrieveTokens(
+export async function retrieveTokens(
+    ctx: TokenKitContext,
+    cookieConfig: CookieConfig = {},
+    storageConfig: TokenStorageConfig = {}
+): Promise<{
+    accessToken: string | null;
+    refreshToken: string | null;
+    expiresAt: number | null;
+    lastRefreshAt: number | null;
+    tokenType: string | null;
+}> {
+    if (getStorageType(storageConfig) === 'session') {
+        const provider = getSessionProvider(ctx, storageConfig);
+        if (!provider) {
+            return { accessToken: null, refreshToken: null, expiresAt: null, lastRefreshAt: null, tokenType: null };
+        }
+
+        const record = await provider.get(ctx, getSessionKey(cookieConfig, storageConfig));
+        return {
+            accessToken: record?.accessToken || null,
+            refreshToken: record?.refreshToken || null,
+            expiresAt: record?.expiresAt || null,
+            lastRefreshAt: record?.lastRefreshAt || null,
+            tokenType: record?.tokenType || null,
+        };
+    }
+
+    return retrieveCookieTokens(ctx, cookieConfig);
+}
+
+export function retrieveCookieTokens(
     ctx: TokenKitContext,
     cookieConfig: CookieConfig = {}
 ): {
@@ -126,9 +212,21 @@ export function retrieveTokens(
 }
 
 /**
- * Clear all auth cookies
+ * Clear tokens from the configured backend
  */
-export function clearTokens(ctx: TokenKitContext, cookieConfig: CookieConfig = {}): void {
+export async function clearTokens(
+    ctx: TokenKitContext,
+    cookieConfig: CookieConfig = {},
+    storageConfig: TokenStorageConfig = {}
+): Promise<void> {
+    if (getStorageType(storageConfig) === 'session') {
+        const provider = getSessionProvider(ctx, storageConfig);
+        if (provider) {
+            await provider.delete(ctx, getSessionKey(cookieConfig, storageConfig));
+        }
+        return;
+    }
+
     const names = getCookieNames(cookieConfig.prefix);
     const options = getCookieOptions(cookieConfig);
 
