@@ -80,4 +80,14 @@ describe('context handling', () => {
             expect(ctx).toBe(mockAPIContext);
         });
     });
+
+    it('should share default storage across isolated module instances', async () => {
+        const writer = await import('../src/client/context?writer');
+        const reader = await import('../src/client/context?reader');
+
+        writer.runWithContext(mockAstro, () => {
+            const ctx = reader.getContextStore();
+            expect(ctx).toBe(mockAstro);
+        });
+    });
 });

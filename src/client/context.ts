@@ -5,9 +5,20 @@ import type { TokenKitContext } from '../types';
 import { getConfig } from '../config';
 
 /**
- * Async local storage for Astro context
+ * Process-wide AsyncLocalStorage for Astro context.
+ *
+ * Astro can bundle the integration/middleware entrypoint and the public client
+ * entrypoint into separate chunks. Keeping the default store on globalThis
+ * ensures middleware and APIClient still read/write the same async context.
  */
-const als = new AsyncLocalStorage<TokenKitContext>();
+const CONTEXT_KEY = Symbol.for('astro-tokenkit.context');
+const globalStorage = globalThis as any;
+
+if (!globalStorage[CONTEXT_KEY]) {
+    globalStorage[CONTEXT_KEY] = new AsyncLocalStorage<TokenKitContext>();
+}
+
+const als = globalStorage[CONTEXT_KEY] as AsyncLocalStorage<TokenKitContext>;
 
 /**
  * Bind Astro context for the current async scope

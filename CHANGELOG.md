@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.30 - 2026-07-05
+
+- Fixed Astro context lookup across separately bundled server chunks by sharing the default AsyncLocalStorage through a process-wide symbol.
+- Added regression coverage for isolated context module instances.
+
 ## 1.0.29 - 2026-07-02
 
 - Added configurable token storage with opt-in Astro session-backed storage.
