@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.31 - 2026-07-09
+
+- Updated development packages: Astro 7.0.7, `@types/node` 26.1.1, and Vitest 4.1.10.
+- Added pnpm build approvals for `esbuild` and Astro's optional `sharp` image dependency.
+
 ## 1.0.30 - 2026-07-05
 
 - Fixed Astro context lookup across separately bundled server chunks by sharing the default AsyncLocalStorage through a process-wide symbol.
