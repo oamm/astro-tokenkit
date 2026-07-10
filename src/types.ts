@@ -130,6 +130,11 @@ export type OnRefreshCallback = (bundle: TokenBundle, ctx: TokenKitContext) => v
 export type OnRefreshErrorCallback = (error: AuthError, ctx: TokenKitContext) => void | Promise<void>;
 
 /**
+ * OnSessionInvalid callback
+ */
+export type OnSessionInvalidCallback = (error: AuthError, ctx: TokenKitContext) => void | Promise<void>;
+
+/**
  * Auth configuration
  */
 export interface AuthConfig {
@@ -192,6 +197,9 @@ export interface AuthConfig {
 
     /** Callback after failed refresh */
     onRefreshError?: OnRefreshErrorCallback;
+
+    /** Callback when stored session data is missing required token fields and refresh cannot be attempted */
+    onSessionInvalid?: OnSessionInvalidCallback;
 }
 
 /**

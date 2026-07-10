@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createClient, runWithContext } from '../src';
+import { AuthError, createClient, runWithContext } from '../src';
 
 function createSessionContext(initial: Record<string, any> = {}) {
     const store = new Map(Object.entries(initial));
@@ -133,5 +133,35 @@ describe('session token storage', () => {
             accessToken: 'new-access',
             refreshToken: 'new-refresh',
         }), expect.anything());
+    });
+
+    it('calls onSessionInvalid when session storage cannot provide a refreshable token record', async () => {
+        const ctx = createSessionContext({
+            tokenkit: {
+                accessToken: 'orphan-access',
+            },
+        });
+        const onSessionInvalid = vi.fn(async (_error: AuthError, callbackCtx: any) => {
+            await callbackCtx.session.delete('tokenkit');
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+                onSessionInvalid,
+            },
+        });
+
+        await runWithContext(ctx as any, async () => {
+            const session = await client.tokenManager?.ensure(ctx as any);
+            expect(session).toBeNull();
+        });
+
+        expect(onSessionInvalid).toHaveBeenCalledWith(expect.any(AuthError), ctx);
+        expect(ctx.session.delete).toHaveBeenCalledWith('tokenkit');
+        expect(ctx.store.has('tokenkit')).toBe(false);
+        expect(global.fetch).not.toHaveBeenCalled();
     });
 });

@@ -272,6 +272,9 @@ export class TokenManager {
         // No tokens
         if (!tokens.accessToken || !tokens.refreshToken || !tokens.expiresAt) {
             logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
+            if (this.config.onSessionInvalid) {
+                await this.config.onSessionInvalid(new AuthError('No valid session found, refresh impossible', 401), ctx);
+            }
             return null;
         }
 

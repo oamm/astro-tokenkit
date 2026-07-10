@@ -33,6 +33,7 @@ export type {
     LoginOptions,
     OnLoginCallback,
     OnErrorCallback,
+    OnSessionInvalidCallback,
     TokenStorageConfig,
     TokenStorageRecord,
     TokenStorageType,

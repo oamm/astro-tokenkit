@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.32 - 2026-07-09
+
+- Added `auth.onSessionInvalid(error, ctx)` for malformed stored sessions where refresh cannot be attempted.
+- Added session-storage regression coverage showing how consumers can clean up invalid session records.
+
 ## 1.0.31 - 2026-07-09
 
 - Updated development packages: Astro 7.0.7, `@types/node` 26.1.1, and Vitest 4.1.10.
