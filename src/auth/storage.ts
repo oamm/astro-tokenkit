@@ -211,6 +211,20 @@ export function retrieveCookieTokens(
     return { accessToken, refreshToken, expiresAt, lastRefreshAt, tokenType };
 }
 
+export function clearCookieTokens(
+    ctx: TokenKitContext,
+    cookieConfig: CookieConfig = {}
+): void {
+    const names = getCookieNames(cookieConfig.prefix);
+    const options = getCookieOptions(cookieConfig);
+
+    ctx.cookies.delete(names.accessToken, { ...options, path: '/' });
+    ctx.cookies.delete(names.refreshToken, { ...options, path: '/' });
+    ctx.cookies.delete(names.expiresAt, { ...options, path: '/' });
+    ctx.cookies.delete(names.lastRefreshAt, { ...options, path: '/' });
+    ctx.cookies.delete(names.tokenType, { ...options, path: '/' });
+}
+
 /**
  * Clear tokens from the configured backend
  */
@@ -227,12 +241,5 @@ export async function clearTokens(
         return;
     }
 
-    const names = getCookieNames(cookieConfig.prefix);
-    const options = getCookieOptions(cookieConfig);
-
-    ctx.cookies.delete(names.accessToken, { ...options, path: '/' });
-    ctx.cookies.delete(names.refreshToken, { ...options, path: '/' });
-    ctx.cookies.delete(names.expiresAt, { ...options, path: '/' });
-    ctx.cookies.delete(names.lastRefreshAt, { ...options, path: '/' });
-    ctx.cookies.delete(names.tokenType, { ...options, path: '/' });
+    clearCookieTokens(ctx, cookieConfig);
 }

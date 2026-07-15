@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.33 - 2026-07-15
+
+- Clear TokenKit storage when persisted token records are incomplete, expired beyond refresh, or refresh returns no bundle.
+- Require access token, refresh token, and access expiry before `getSession()` or `getSessionAsync()` returns a session.
+- Keep TokenKit scoped to token validity by clearing invalid TokenKit data without deciding app-level SessionKit user validity.
+- Added regression coverage for missing token fields, failed expired refresh cleanup, and successful refresh persistence.
+
 ## 1.0.32 - 2026-07-09
 
 - Added `auth.onSessionInvalid(error, ctx)` for malformed stored sessions where refresh cannot be attempted.

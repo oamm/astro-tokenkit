@@ -3,7 +3,7 @@
 import {APIResponse, AuthError} from '../types';
 import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
-import { storeTokens, retrieveTokens, retrieveCookieTokens, clearTokens } from './storage';
+import { storeTokens, retrieveTokens, retrieveCookieTokens, clearTokens, clearCookieTokens } from './storage';
 import { shouldRefresh, isExpired } from './policy';
 import { safeFetch } from '../utils/fetch';
 import { logger } from '../utils/logger';
@@ -242,13 +242,18 @@ export class TokenManager {
         const body = await response.json().catch(() => ({}));
 
         // Parse response
-        let bundle: TokenBundle;
+        let bundle: TokenBundle | null;
         try {
             bundle = this.config.parseRefresh
                 ? this.config.parseRefresh(body)
                 : autoDetectFields(body, this.config.fields);
         } catch (error: any) {
             throw new AuthError(`Invalid refresh response: ${error.message}`, response.status, response);
+        }
+
+        if (!bundle) {
+            await this.clearTokens(ctx);
+            return null;
         }
 
         // Validate bundle
@@ -270,8 +275,9 @@ export class TokenManager {
         const tokens = await this.retrieveTokens(ctx);
 
         // No tokens
-        if (!tokens.accessToken || !tokens.refreshToken || !tokens.expiresAt) {
+        if (!this.hasRequiredTokens(tokens)) {
             logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
+            await this.clearTokens(ctx);
             if (this.config.onSessionInvalid) {
                 await this.config.onSessionInvalid(new AuthError('No valid session found, refresh impossible', 401), ctx);
             }
@@ -325,18 +331,14 @@ export class TokenManager {
 
             // Refresh failed or returned no bundle, check if tokens still exist
             const currentTokens = await this.retrieveTokens(ctx);
-            if (!currentTokens.accessToken) {
+            if (!this.hasRequiredTokens(currentTokens)) {
+                await this.clearTokens(ctx);
                 return null;
             }
         }
 
         // Return current session
-        return {
-            accessToken: tokens.accessToken,
-            expiresAt: tokens.expiresAt,
-            tokenType: tokens.tokenType ?? undefined,
-            payload: parseJWTPayload(tokens.accessToken) ?? undefined,
-        };
+        return this.toSession(tokens);
     }
 
     /**
@@ -381,16 +383,12 @@ export class TokenManager {
     getSession(ctx: TokenKitContext): Session | null {
         const tokens = retrieveCookieTokens(ctx, this.config.cookies);
 
-        if (!tokens.accessToken || !tokens.expiresAt) {
+        if (!this.hasRequiredTokens(tokens)) {
+            clearCookieTokens(ctx, this.config.cookies);
             return null;
         }
 
-        return {
-            accessToken: tokens.accessToken,
-            expiresAt: tokens.expiresAt,
-            tokenType: tokens.tokenType ?? undefined,
-            payload: parseJWTPayload(tokens.accessToken) ?? undefined,
-        };
+        return this.toSession(tokens);
     }
 
     /**
@@ -399,16 +397,12 @@ export class TokenManager {
     async getSessionAsync(ctx: TokenKitContext): Promise<Session | null> {
         const tokens = await this.retrieveTokens(ctx);
 
-        if (!tokens.accessToken || !tokens.expiresAt) {
+        if (!this.hasRequiredTokens(tokens)) {
+            await this.clearTokens(ctx);
             return null;
         }
 
-        return {
-            accessToken: tokens.accessToken,
-            expiresAt: tokens.expiresAt,
-            tokenType: tokens.tokenType ?? undefined,
-            payload: parseJWTPayload(tokens.accessToken) ?? undefined,
-        };
+        return this.toSession(tokens);
     }
 
     /**
@@ -445,6 +439,33 @@ export class TokenManager {
 
     private clearTokens(ctx: TokenKitContext): Promise<void> {
         return clearTokens(ctx, this.config.cookies, this.config.storage);
+    }
+
+    private hasRequiredTokens(tokens: {
+        accessToken: string | null;
+        refreshToken: string | null;
+        expiresAt: number | null;
+    }): tokens is {
+        accessToken: string;
+        refreshToken: string;
+        expiresAt: number;
+        lastRefreshAt?: number | null;
+        tokenType?: string | null;
+    } {
+        return !!(tokens.accessToken && tokens.refreshToken && tokens.expiresAt);
+    }
+
+    private toSession(tokens: {
+        accessToken: string;
+        expiresAt: number;
+        tokenType?: string | null;
+    }): Session {
+        return {
+            accessToken: tokens.accessToken,
+            expiresAt: tokens.expiresAt,
+            tokenType: tokens.tokenType ?? undefined,
+            payload: parseJWTPayload(tokens.accessToken) ?? undefined,
+        };
     }
 
     /**

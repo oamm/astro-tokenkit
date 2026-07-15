@@ -29,6 +29,7 @@ describe('Security Fixes', () => {
             // Mock session
             (mockAstro.cookies.get as any).mockImplementation((name: string) => {
                 if (name === 'access_token') return { value: 'secret-token' };
+                if (name === 'refresh_token') return { value: 'refresh-token' };
                 if (name === 'access_expires_at') return { value: (Math.floor(Date.now() / 1000) + 3600).toString() };
                 return null;
             });
@@ -74,6 +75,7 @@ describe('Security Fixes', () => {
 
             (mockAstro.cookies.get as any).mockImplementation((name: string) => {
                 if (name === 'access_token') return { value: 'secret-token' };
+                if (name === 'refresh_token') return { value: 'refresh-token' };
                 if (name === 'access_expires_at') return { value: (Math.floor(Date.now() / 1000) + 3600).toString() };
                 return null;
             });
@@ -111,6 +113,7 @@ describe('Security Fixes', () => {
 
             (mockAstro.cookies.get as any).mockImplementation((name: string) => {
                 if (name === 'access_token') return { value: 'current-token' };
+                if (name === 'refresh_token') return { value: 'refresh-token' };
                 if (name === 'access_expires_at') return { value: (Math.floor(Date.now() / 1000) + 3600).toString() };
                 return null;
             });
