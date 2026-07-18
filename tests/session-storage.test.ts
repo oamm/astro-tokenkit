@@ -23,6 +23,20 @@ function createSessionContext(initial: Record<string, any> = {}) {
     };
 }
 
+function createDestroyableSessionContext(initial: Record<string, any> = {}) {
+    const ctx = createSessionContext(initial);
+
+    return {
+        ...ctx,
+        session: {
+            ...ctx.session,
+            destroy: vi.fn(() => {
+                ctx.store.clear();
+            }),
+        },
+    };
+}
+
 describe('session token storage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -163,5 +177,66 @@ describe('session token storage', () => {
         expect(ctx.session.delete).toHaveBeenCalledWith('tokenkit');
         expect(ctx.store.has('tokenkit')).toBe(false);
         expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('destroys the full Astro session when clearing session storage', async () => {
+        const ctx = createDestroyableSessionContext({
+            tokenkit: {
+                accessToken: 'access',
+                refreshToken: 'refresh',
+                expiresAt: Math.floor(Date.now() / 1000) + 3600,
+                lastRefreshAt: Math.floor(Date.now() / 1000),
+            },
+            user: { id: 'user-1' },
+            preferences: { theme: 'dark' },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        await client.tokenManager?.clear(ctx as any);
+
+        expect(ctx.session.destroy).toHaveBeenCalled();
+        expect(ctx.session.delete).not.toHaveBeenCalled();
+        expect(ctx.store.size).toBe(0);
+    });
+
+    it('destroys the full Astro session when refresh token is invalid', async () => {
+        const ctx = createDestroyableSessionContext({
+            tokenkit: {
+                accessToken: 'old-access',
+                refreshToken: 'old-refresh',
+                expiresAt: Math.floor(Date.now() / 1000) - 60,
+                lastRefreshAt: Math.floor(Date.now() / 1000) - 120,
+            },
+            user: { id: 'user-1' },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            statusText: 'Unauthorized',
+        });
+
+        await runWithContext(ctx as any, async () => {
+            const session = await client.tokenManager?.ensure(ctx as any);
+            expect(session).toBeNull();
+        });
+
+        expect(ctx.session.destroy).toHaveBeenCalled();
+        expect(ctx.store.size).toBe(0);
     });
 });

@@ -274,8 +274,29 @@ export class TokenManager {
         const now = Math.floor(Date.now() / 1000);
         const tokens = await this.retrieveTokens(ctx);
 
-        // No tokens
+        // Refresh-token-only records can happen after the browser drops short-lived
+        // access-token cookies. They are still refreshable and should not be
+        // treated as an invalid app session.
         if (!this.hasRequiredTokens(tokens)) {
+            if (tokens.refreshToken) {
+                logger.debug('[TokenKit] Access token data missing, attempting refresh with refresh token', !!this.config.debug);
+                const bundle = await this.refresh(ctx, tokens.refreshToken, options, headers);
+
+                if (!bundle) {
+                    logger.debug('[TokenKit] Refresh returned no bundle, session lost', !!this.config.debug);
+                    return null;
+                }
+
+                await this.storeTokens(ctx, bundle);
+
+                return {
+                    accessToken: bundle.accessToken,
+                    expiresAt: bundle.accessExpiresAt,
+                    tokenType: bundle.tokenType,
+                    payload: bundle.sessionPayload ?? parseJWTPayload(bundle.accessToken) ?? undefined,
+                };
+            }
+
             logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
             await this.clearTokens(ctx);
             if (this.config.onSessionInvalid) {
@@ -378,12 +399,19 @@ export class TokenManager {
     }
 
     /**
+     * Clear stored TokenKit data without calling the configured logout endpoint.
+     */
+    async clear(ctx: TokenKitContext): Promise<void> {
+        await this.clearTokens(ctx);
+    }
+
+    /**
      * Get current session (no refresh)
      */
     getSession(ctx: TokenKitContext): Session | null {
         const tokens = retrieveCookieTokens(ctx, this.config.cookies);
 
-        if (!this.hasRequiredTokens(tokens)) {
+        if (!this.hasRequiredTokens(tokens) || isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
             clearCookieTokens(ctx, this.config.cookies);
             return null;
         }
@@ -397,7 +425,7 @@ export class TokenManager {
     async getSessionAsync(ctx: TokenKitContext): Promise<Session | null> {
         const tokens = await this.retrieveTokens(ctx);
 
-        if (!this.hasRequiredTokens(tokens)) {
+        if (!this.hasRequiredTokens(tokens) || isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
             await this.clearTokens(ctx);
             return null;
         }

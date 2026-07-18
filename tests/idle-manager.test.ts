@@ -40,6 +40,10 @@ describe('IdleManager', () => {
             removeEventListener: vi.fn(),
             dispatchEvent: vi.fn(),
             location: { pathname: '/' },
+            history: {
+                pushState: vi.fn(),
+                replaceState: vi.fn(),
+            },
         } as any;
         (global as any).CustomEvent = class {
             constructor(type: string, options: any) {
@@ -187,6 +191,37 @@ describe('IdleManager', () => {
         vi.advanceTimersByTime(2000);
         
         expect(onIdle).not.toHaveBeenCalled();
+        manager.cleanup();
+    });
+
+    it('should reset idle time on programmatic navigation', () => {
+        const manager = new IdleManager({ timeout: 60, onIdle });
+
+        const initialExpires = parseInt(vi.mocked((global as any).localStorage.getItem)('_tk_idle_expires') || '0');
+
+        vi.advanceTimersByTime(10000);
+        window.history.pushState({}, '', '/settings');
+
+        const newExpires = parseInt(vi.mocked((global as any).localStorage.getItem)('_tk_idle_expires') || '0');
+        expect(newExpires).toBeGreaterThan(initialExpires);
+        manager.cleanup();
+    });
+
+    it('should start monitoring when navigating away from an initially excluded path', () => {
+        (window.location as any).pathname = '/login';
+        const manager = new IdleManager({
+            timeout: 60,
+            onIdle,
+            excludePaths: ['/login'],
+        });
+
+        expect((global as any).localStorage.setItem).not.toHaveBeenCalledWith('_tk_idle_expires', expect.any(String));
+
+        (window.location as any).pathname = '/dashboard';
+        window.history.pushState({}, '', '/dashboard');
+
+        expect((global as any).localStorage.setItem).toHaveBeenCalledWith('_tk_idle_expires', expect.any(String));
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
         manager.cleanup();
     });
 });

@@ -242,6 +242,7 @@ export interface TokenSessionProvider {
     get?: (ctx: TokenKitContext, key: string) => TokenStorageRecord | undefined | null | Promise<TokenStorageRecord | undefined | null>;
     set?: (ctx: TokenKitContext, key: string, value: TokenStorageRecord, options?: { ttl?: number }) => void | Promise<void>;
     delete?: (ctx: TokenKitContext, key: string) => void | Promise<void>;
+    destroy?: (ctx: TokenKitContext) => void | Promise<void>;
 }
 
 export interface TokenStorageConfig {

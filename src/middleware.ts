@@ -6,6 +6,7 @@ import {getConfig, getTokenManager} from './config';
 import {logger} from './utils/logger';
 
 const LOGGED_KEY = Symbol.for('astro-tokenkit.middleware.logged');
+const IDLE_LOGOUT_COOKIE = '_tk_idle_logout';
 
 /**
  * Create middleware for context binding and automatic token rotation
@@ -36,6 +37,12 @@ export function createMiddleware(): MiddlewareHandler {
             // Proactively ensure a valid session if auth is configured
             if (tokenManager) {
                 try {
+                    if (ctx.cookies.get(IDLE_LOGOUT_COOKIE)?.value === '1') {
+                        await tokenManager.clear(ctx);
+                        ctx.cookies.delete(IDLE_LOGOUT_COOKIE, { path: '/' });
+                        return next();
+                    }
+
                     // This handles token rotation (refresh) if needed
                     await tokenManager.ensure(ctx);
                 } catch (error: any) {

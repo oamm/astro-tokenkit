@@ -15,6 +15,9 @@ describe('APIClient with global config', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        (mockAstro.cookies.get as any).mockReset();
+        (mockAstro.cookies.set as any).mockReset();
+        (mockAstro.cookies.delete as any).mockReset();
         // Reset global config
         setConfig({
             baseURL: '',
@@ -110,6 +113,36 @@ describe('APIClient with global config', () => {
         // Should have called refresh (ensure)
         expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/refresh'), expect.anything());
         expect(mockAstro.cookies.set).toHaveBeenCalledWith('access_token', 'new-access', expect.anything());
+    });
+
+    it('should clear tokens and skip refresh after idle logout marker', async () => {
+        setConfig({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+            }
+        });
+
+        (mockAstro.cookies.get as any).mockImplementation((name: string) => {
+            if (name === '_tk_idle_logout') return { value: '1' };
+            if (name === 'refresh_token') return { value: 'old-refresh' };
+            return null;
+        });
+
+        global.fetch = vi.fn();
+
+        const next = vi.fn().mockResolvedValue('next-result');
+        const middleware = defineMiddleware();
+
+        const result = await middleware(mockAstro, next);
+
+        expect(result).toBe('next-result');
+        expect(next).toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(mockAstro.cookies.delete).toHaveBeenCalledWith('access_token', expect.anything());
+        expect(mockAstro.cookies.delete).toHaveBeenCalledWith('refresh_token', expect.anything());
+        expect(mockAstro.cookies.delete).toHaveBeenCalledWith('_tk_idle_logout', { path: '/' });
     });
 
     it('should skip runWithContext in middleware if getContextStore is defined globally', async () => {

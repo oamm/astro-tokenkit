@@ -155,7 +155,7 @@ tokenKit({
 })
 ```
 
-Session storage uses `ctx.session.get/set/delete` and writes the token bundle under the `tokenkit` session key. You can customize the key:
+Session storage uses `ctx.session.get/set/delete` and writes the token bundle under the `tokenkit` session key. When TokenKit clears auth state during logout, invalid refresh, or idle cleanup, it calls `ctx.session.destroy()` if available so all session data is removed. If `destroy()` is not available, it falls back to deleting only the TokenKit key. You can customize the key:
 
 ```javascript
 storage: { type: 'session', key: 'auth_tokens' }
@@ -169,7 +169,8 @@ storage: {
   provider: {
     get: (ctx, key) => ctx.locals.session.get(key),
     set: (ctx, key, value, options) => ctx.locals.session.set(key, value, options),
-    delete: (ctx, key) => ctx.locals.session.delete(key)
+    delete: (ctx, key) => ctx.locals.session.delete(key),
+    destroy: (ctx) => ctx.locals.session.destroy()
   }
 }
 ```

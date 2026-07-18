@@ -9,6 +9,8 @@ import type {
     TokenSessionProvider
 } from '../types';
 
+type ResolvedTokenSessionProvider = Required<Pick<TokenSessionProvider, 'get' | 'set' | 'delete'>> & Pick<TokenSessionProvider, 'destroy'>;
+
 /**
  * Cookie names
  */
@@ -57,7 +59,7 @@ function getSessionKey(cookieConfig: CookieConfig = {}, storageConfig: TokenStor
     return cookieConfig.prefix ? `${cookieConfig.prefix}_tokenkit` : 'tokenkit';
 }
 
-function getSessionProvider(ctx: TokenKitContext, storageConfig: TokenStorageConfig = {}): Required<TokenSessionProvider> | null {
+function getSessionProvider(ctx: TokenKitContext, storageConfig: TokenStorageConfig = {}): ResolvedTokenSessionProvider | null {
     const session = storageConfig.provider ?? ctx.session;
     if (!session?.get || !session?.set || !session?.delete) return null;
 
@@ -71,6 +73,11 @@ function getSessionProvider(ctx: TokenKitContext, storageConfig: TokenStorageCon
         delete: (deleteCtx, key) => storageConfig.provider
             ? session.delete(deleteCtx, key)
             : session.delete(key),
+        destroy: storageConfig.provider
+            ? session.destroy
+            : typeof session.destroy === 'function'
+                ? (destroyCtx) => destroyCtx.session.destroy()
+                : undefined,
     };
 }
 
@@ -98,7 +105,6 @@ export async function storeTokens(
     const now = Math.floor(Date.now() / 1000);
 
     // Calculate max age
-    const accessMaxAge = Math.max(0, bundle.accessExpiresAt - now);
     const refreshMaxAge = bundle.refreshExpiresAt
         ? Math.max(0, bundle.refreshExpiresAt - now)
         : 7 * 24 * 60 * 60; // Default 7 days
@@ -115,10 +121,11 @@ export async function storeTokens(
         return;
     }
 
-    // Set access token
+    // Keep the access-token metadata until the refresh token expires so server-side
+    // navigation can still detect an expired access token and rotate it.
     ctx.cookies.set(names.accessToken, bundle.accessToken, {
         ...options,
-        maxAge: accessMaxAge,
+        maxAge: refreshMaxAge,
         path: '/',
     });
 
@@ -132,14 +139,14 @@ export async function storeTokens(
     // Set expiration timestamp
     ctx.cookies.set(names.expiresAt, bundle.accessExpiresAt.toString(), {
         ...options,
-        maxAge: accessMaxAge,
+        maxAge: refreshMaxAge,
         path: '/',
     });
 
     // Set last refresh timestamp
     ctx.cookies.set(names.lastRefreshAt, now.toString(), {
         ...options,
-        maxAge: accessMaxAge,
+        maxAge: refreshMaxAge,
         path: '/',
     });
 
@@ -147,7 +154,7 @@ export async function storeTokens(
     if (bundle.tokenType) {
         ctx.cookies.set(names.tokenType, bundle.tokenType, {
             ...options,
-            maxAge: accessMaxAge,
+            maxAge: refreshMaxAge,
             path: '/',
         });
     }
@@ -236,7 +243,11 @@ export async function clearTokens(
     if (getStorageType(storageConfig) === 'session') {
         const provider = getSessionProvider(ctx, storageConfig);
         if (provider) {
-            await provider.delete(ctx, getSessionKey(cookieConfig, storageConfig));
+            if (provider.destroy) {
+                await provider.destroy(ctx);
+            } else if (provider.delete) {
+                await provider.delete(ctx, getSessionKey(cookieConfig, storageConfig));
+            }
         }
         return;
     }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.34 - 2026-07-18
+
+- Refresh sessions when a refresh token remains available but access-token metadata has expired or gone missing.
+- Keep cookie-backed access-token metadata available for the refresh-token lifetime while still treating expired sessions as inactive in read-only session helpers.
+- Destroy the full Astro session for session-backed auth cleanup when `ctx.session.destroy()` or a custom provider `destroy(ctx)` hook is available.
+- Prevent idle logout from being undone by the next navigation by setting an idle marker that middleware uses to clear auth state and skip refresh.
+- Treat client-side navigation as idle activity while keeping idle monitoring from reactivating authenticated sessions.
+- Added regression coverage for refresh-token-only recovery, idle logout cleanup, full Astro session destroy, and SPA navigation idle behavior.
+
 ## 1.0.33 - 2026-07-15
 
 - Clear TokenKit storage when persisted token records are incomplete, expired beyond refresh, or refresh returns no bundle.

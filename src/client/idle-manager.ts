@@ -17,6 +17,11 @@ export class IdleManager {
     private isMonitoring = false;
     private lastActivity = 0;
     private expiredTimeKey: string;
+    private navigationHandler: () => void;
+    private visibilityHandler: () => void;
+    private hasVisibilityListener = false;
+    private originalPushState: History['pushState'] | null = null;
+    private originalReplaceState: History['replaceState'] | null = null;
 
     constructor(config: IdleConfig) {
         this.config = config;
@@ -24,6 +29,8 @@ export class IdleManager {
         this.activeTabOnly = config.activeTabOnly ?? true;
         this.expiredTimeKey = '_tk_idle_expires';
         this.eventHandler = this.reportActivity.bind(this);
+        this.navigationHandler = this.handleNavigation.bind(this);
+        this.visibilityHandler = this.handleVisibilityChange.bind(this);
         this.isIdle = false;
 
         const onIdleProp = config.onIdle;
@@ -60,17 +67,31 @@ export class IdleManager {
     private start() {
         if (typeof window === 'undefined') return;
 
+        this.setupNavigationListeners();
+        this.resumeMonitoringIfAllowed();
+    }
+
+    private resumeMonitoringIfAllowed() {
+        if (this.isIdle) return;
+
         if (this.isExcluded()) {
+            this.removeTrackers();
             return;
         }
 
         this.updateExpiredTimeLocal();
         this.setupEventListeners();
-        this.loop();
+        this.scheduleLoop();
     }
 
     private loop() {
         if (this.isIdle) return;
+
+        if (this.isExcluded()) {
+            this.removeTrackers();
+            this.scheduleLoop();
+            return;
+        }
 
         const now = Date.now();
         // Check every 1 second
@@ -83,24 +104,87 @@ export class IdleManager {
             this.lastCheck = now;
         }
 
-        this.rafId = requestAnimationFrame(() => this.loop());
+        this.scheduleLoop();
+    }
+
+    private scheduleLoop() {
+        if (this.rafId !== null || this.isIdle) return;
+        this.rafId = requestAnimationFrame(() => {
+            this.rafId = null;
+            this.loop();
+        });
     }
 
     private setupEventListeners() {
         if (this.activeTabOnly) {
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                    this.addTrackers();
-                } else {
-                    this.removeTrackers();
-                }
-            });
+            if (!this.hasVisibilityListener) {
+                document.addEventListener('visibilitychange', this.visibilityHandler);
+                this.hasVisibilityListener = true;
+            }
 
             if (document.visibilityState === 'visible') {
                 this.addTrackers();
             }
         } else {
             this.addTrackers();
+        }
+    }
+
+    private setupNavigationListeners() {
+        window.addEventListener('popstate', this.navigationHandler);
+        window.addEventListener('hashchange', this.navigationHandler);
+        window.addEventListener('pageshow', this.navigationHandler);
+        document.addEventListener('astro:page-load', this.navigationHandler);
+        document.addEventListener('astro:after-swap', this.navigationHandler);
+
+        if (typeof window.history === 'undefined') return;
+
+        this.originalPushState = window.history.pushState;
+        this.originalReplaceState = window.history.replaceState;
+
+        const manager = this;
+        window.history.pushState = function pushState(...args) {
+            const result = manager.originalPushState!.apply(this, args);
+            manager.handleNavigation();
+            return result;
+        };
+
+        window.history.replaceState = function replaceState(...args) {
+            const result = manager.originalReplaceState!.apply(this, args);
+            manager.handleNavigation();
+            return result;
+        };
+    }
+
+    private removeNavigationListeners() {
+        window.removeEventListener('popstate', this.navigationHandler);
+        window.removeEventListener('hashchange', this.navigationHandler);
+        window.removeEventListener('pageshow', this.navigationHandler);
+        document.removeEventListener('astro:page-load', this.navigationHandler);
+        document.removeEventListener('astro:after-swap', this.navigationHandler);
+
+        if (typeof window.history !== 'undefined') {
+            if (this.originalPushState) {
+                window.history.pushState = this.originalPushState;
+                this.originalPushState = null;
+            }
+            if (this.originalReplaceState) {
+                window.history.replaceState = this.originalReplaceState;
+                this.originalReplaceState = null;
+            }
+        }
+    }
+
+    private handleNavigation() {
+        this.lastActivity = 0;
+        this.resumeMonitoringIfAllowed();
+    }
+
+    private handleVisibilityChange() {
+        if (document.visibilityState === 'visible') {
+            this.addTrackers();
+        } else {
+            this.removeTrackers();
         }
     }
 
@@ -177,6 +261,11 @@ export class IdleManager {
             this.rafId = null;
         }
         this.removeTrackers();
+        this.removeNavigationListeners();
+        if (this.hasVisibilityListener) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.hasVisibilityListener = false;
+        }
         if (this.channel) {
             this.channel.close();
             this.channel = null;
