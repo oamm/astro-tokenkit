@@ -259,6 +259,35 @@ await api.get('/data', {
 });
 ```
 
+### File and Binary Uploads
+
+Use `sendBytes()` for `application/octet-stream` requests:
+
+```typescript
+const { data } = await api.sendBytes('/storage/raw', fileBytes, {
+  accept: 'application/json',
+});
+```
+
+Use `uploadFiles()` for multipart uploads while keeping TokenKit as the single API client for base URL, auth, timeout, retries, and SSL options:
+
+```typescript
+const { data } = await api.uploadFiles<Document[]>(
+  `/storage/documents/${folder.replace(/:/g, '_')}`,
+  documents
+    .filter(doc => doc.file)
+    .map((doc, index) => ({
+      file: doc.file,
+      name: doc.name || `file_${index}`,
+    })),
+  {
+    params: { batchId },
+  }
+);
+```
+
+By default, `uploadFiles()` appends each file as `files[index]` and each filename as `Name[index]`. For a prebuilt `FormData` instance, use `uploadForm()`. TokenKit does not set `Content-Type` for multipart requests, allowing `fetch` to include the correct boundary.
+
 ## Advanced Usage
 
 ### Manual Context

@@ -191,4 +191,91 @@ describe('Request body and headers for various methods', () => {
             expect(headers['Content-Type']).toBeUndefined();
         });
     });
+
+    it('should send raw octet-stream bodies without JSON serialization', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'ok' }),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        const bytes = new Uint8Array([1, 2, 3]);
+
+        await als.run(mockAstro, async () => {
+            await api.sendBytes('/binary', bytes, {
+                headers: { Accept: 'application/json' },
+            });
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        expect(init.method).toBe('POST');
+        expect(init.body).toBeInstanceOf(Blob);
+        expect(await (init.body as Blob).arrayBuffer()).toEqual(bytes.buffer);
+        expect(init.headers).toEqual(expect.objectContaining({
+            'Content-Type': 'application/octet-stream',
+            Accept: 'application/json',
+        }));
+    });
+
+    it('should send caller-provided raw bodies through request()', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'ok' }),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        const body = new Blob(['raw'], { type: 'application/octet-stream' });
+
+        await als.run(mockAstro, async () => {
+            await api.request({
+                method: 'POST',
+                url: '/raw',
+                body,
+                headers: { 'Content-Type': 'application/octet-stream' },
+            });
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        expect(init.body).toBe(body);
+        expect(init.headers).toEqual(expect.objectContaining({
+            'Content-Type': 'application/octet-stream',
+        }));
+    });
+
+    it('should upload FormData without overriding multipart Content-Type', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve([{ id: 1 }]),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        await als.run(mockAstro, async () => {
+            await api.uploadFiles('/documents/folder', [
+                { file: new Uint8Array([1, 2, 3]), name: 'a.pdf' },
+                { file: new Blob(['b']), name: 'b.pdf' },
+            ], {
+                params: { batchId: 'batch-1' },
+            });
+        });
+
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(url).toBe('https://api.example.com/documents/folder?batchId=batch-1');
+        expect(init.body).toBeInstanceOf(FormData);
+        expect(init.headers['Content-Type']).toBeUndefined();
+
+        const formData = init.body as FormData;
+        expect(formData.get('files[0]')).toBeInstanceOf(Blob);
+        expect(formData.get('Name[0]')).toBe('a.pdf');
+        expect(formData.get('files[1]')).toBeInstanceOf(Blob);
+        expect(formData.get('Name[1]')).toBe('b.pdf');
+    });
 });

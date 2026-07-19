@@ -58,7 +58,46 @@ export interface RequestOptions {
 export interface RequestConfig extends RequestOptions {
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     url: string;
+    /** JSON-compatible request payload. TokenKit serializes this as application/json. */
     data?: any;
+    /** Raw fetch body. Use for FormData, Blob, ArrayBuffer, streams, or other BodyInit payloads. */
+    body?: BodyInit | null;
+}
+
+export type BodyMethod = 'POST' | 'PUT' | 'PATCH';
+
+export interface SendOptions extends RequestOptions {
+    /** HTTP method used for the request (default: POST). */
+    method?: BodyMethod;
+    /** Content-Type header for the raw body. */
+    contentType?: string;
+    /** Accept header for the response. */
+    accept?: string;
+}
+
+export interface UploadFormOptions extends RequestOptions {
+    /** HTTP method used for the upload request (default: POST). */
+    method?: BodyMethod;
+}
+
+export interface UploadFileInput {
+    /** File/blob/binary content to append to FormData. */
+    file: Blob | ArrayBuffer | ArrayBufferView;
+    /** Filename sent to the server. */
+    name?: string;
+    /** Multipart field name for the file part. */
+    fieldName?: string;
+    /** Blob MIME type used when wrapping binary values (default: application/octet-stream). */
+    contentType?: string;
+}
+
+export interface UploadFilesOptions extends UploadFormOptions {
+    /** Multipart field name for each file (default: files[index]). */
+    fileField?: string | ((file: UploadFileInput, index: number) => string);
+    /** Companion field name for each filename (default: Name[index]). Pass false to disable. */
+    nameField?: string | false | ((file: UploadFileInput, index: number) => string);
+    /** Additional form fields to append before file parts. */
+    fields?: Record<string, any> | ((file: UploadFileInput, index: number) => Record<string, any> | undefined);
 }
 
 /**

@@ -7,10 +7,14 @@ import type {
     LoginOptions,
     RequestConfig,
     RequestOptions,
+    SendOptions,
     Session,
     TokenBundle,
     TokenKitConfig,
-    TokenKitContext
+    TokenKitContext,
+    UploadFileInput,
+    UploadFilesOptions,
+    UploadFormOptions
 } from '../types';
 import {APIError, AuthError, NetworkError, TimeoutError} from '../types';
 import {TokenManager} from '../auth/manager';
@@ -145,6 +149,107 @@ export class APIClient {
     }
 
     /**
+     * Send a raw request body. Useful for octet-stream, Blob, ArrayBuffer,
+     * ReadableStream, URLSearchParams, and other fetch BodyInit payloads.
+     */
+    async send<T = any>(url: string, body: BodyInit, options?: SendOptions): Promise<APIResponse<T>> {
+        const {
+            method = 'POST',
+            contentType,
+            accept,
+            headers: optionHeaders,
+            ...requestOptions
+        } = options ?? {};
+
+        const headers: Record<string, string> = {
+            ...optionHeaders,
+        };
+
+        if (contentType && !headers['Content-Type'] && !headers['content-type']) {
+            headers['Content-Type'] = contentType;
+        }
+
+        if (accept && !headers['Accept'] && !headers['accept']) {
+            headers['Accept'] = accept;
+        }
+
+        return this.request<T>({
+            method,
+            url,
+            body,
+            headers,
+            ...requestOptions,
+        });
+    }
+
+    /**
+     * Send binary content as application/octet-stream.
+     */
+    async sendBytes<T = any>(
+        url: string,
+        bytes: Blob | ArrayBuffer | ArrayBufferView,
+        options?: SendOptions
+    ): Promise<APIResponse<T>> {
+        const body = this.toBodyInit(bytes, options?.contentType ?? 'application/octet-stream');
+        return this.send<T>(url, body, {
+            contentType: 'application/octet-stream',
+            ...options,
+        });
+    }
+
+    /**
+     * Upload an existing FormData instance. Content-Type is intentionally not
+     * set so fetch can include the generated multipart boundary.
+     */
+    async uploadForm<T = any>(url: string, formData: FormData, options?: UploadFormOptions): Promise<APIResponse<T>> {
+        const { method = 'POST', ...requestOptions } = options ?? {};
+
+        return this.request<T>({
+            method,
+            url,
+            body: formData,
+            ...requestOptions,
+        });
+    }
+
+    /**
+     * Build and upload multipart form data from file descriptors.
+     */
+    async uploadFiles<T = any>(
+        url: string,
+        files: UploadFileInput[],
+        options?: UploadFilesOptions
+    ): Promise<APIResponse<T>> {
+        const {
+            fileField = (_file: UploadFileInput, index: number) => `files[${index}]`,
+            nameField = (_file: UploadFileInput, index: number) => `Name[${index}]`,
+            fields,
+            ...requestOptions
+        } = options ?? {};
+
+        const formData = new FormData();
+        if (fields && typeof fields !== 'function') {
+            this.appendFormFields(formData, fields);
+        }
+
+        files.forEach((file, index) => {
+            if (typeof fields === 'function') {
+                this.appendFormFields(formData, fields(file, index));
+            }
+
+            const fieldName = file.fieldName ?? this.resolveUploadField(fileField, file, index);
+            const fileName = file.name ?? `file_${index}`;
+            formData.append(fieldName, this.toBlob(file.file, file.contentType), fileName);
+
+            if (nameField !== undefined && nameField !== false) {
+                formData.append(this.resolveUploadField(nameField, file, index), fileName);
+            }
+        });
+
+        return this.uploadForm<T>(url, formData, requestOptions);
+    }
+
+    /**
      * DELETE request
      */
     async delete<T = any>(url: string, options?: RequestOptions): Promise<APIResponse<T>> {
@@ -222,7 +327,9 @@ export class APIClient {
 
         // Add body for appropriate methods
         const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
-        if (requestConfig.data && !methodsWithNoBody.includes(method)) {
+        if (requestConfig.body !== undefined && requestConfig.body !== null && !methodsWithNoBody.includes(method)) {
+            init.body = requestConfig.body;
+        } else if (requestConfig.data && !methodsWithNoBody.includes(method)) {
             init.body = JSON.stringify(requestConfig.data);
 
             // Add Content-Type if not already present
@@ -396,6 +503,42 @@ export class APIClient {
             // Only allow relative paths if baseURL is missing or invalid
             return !url.startsWith('http') && !url.startsWith('//');
         }
+    }
+
+    private resolveUploadField(
+        field: string | ((file: UploadFileInput, index: number) => string),
+        file: UploadFileInput,
+        index: number
+    ): string {
+        return typeof field === 'function' ? field(file, index) : field;
+    }
+
+    private appendFormFields(formData: FormData, fields?: Record<string, any>): void {
+        if (!fields) return;
+
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value === undefined || value === null) return;
+
+            if (Array.isArray(value)) {
+                value.forEach(item => {
+                    if (item !== undefined && item !== null) {
+                        formData.append(key, String(item));
+                    }
+                });
+            } else {
+                formData.append(key, String(value));
+            }
+        });
+    }
+
+    private toBodyInit(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType: string): BodyInit {
+        if (bytes instanceof Blob) return bytes;
+        return this.toBlob(bytes, contentType);
+    }
+
+    private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType = 'application/octet-stream'): Blob {
+        if (bytes instanceof Blob) return bytes;
+        return new Blob([bytes as BlobPart], { type: contentType });
     }
 
     /**

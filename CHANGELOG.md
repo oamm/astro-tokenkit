@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.35 - 2026-07-19
+
+- Added raw request body support through `RequestConfig.body` so callers can send `FormData`, `Blob`, `ArrayBuffer`, and other fetch `BodyInit` payloads without JSON serialization.
+- Added `api.send()` and `api.sendBytes()` helpers for concise raw-body and `application/octet-stream` requests.
+- Added `api.uploadForm()` and `api.uploadFiles()` helpers for multipart uploads while preserving TokenKit base URL, auth injection, timeout, retry, and SSL configuration.
+- Defaulted `uploadFiles()` multipart field names to indexed document upload fields: `files[index]` and `Name[index]`, with overrides still available for custom APIs.
+- Documented binary and file upload usage and added regression coverage for raw bodies, octet-stream requests, and multipart uploads.
+
 ## 1.0.34 - 2026-07-18
 
 - Refresh sessions when a refresh token remains available but access-token metadata has expired or gone missing.
