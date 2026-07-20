@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { api, createClient, setConfig } from '../src';
+import {
+    api,
+    createClient,
+    getDocumentMimeType,
+    isMultipartFormData,
+    MIME_TYPES,
+    setConfig,
+    shouldSetContentTypeHeader
+} from '../src';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 describe('Request body and headers for various methods', () => {
@@ -215,9 +223,44 @@ describe('Request body and headers for various methods', () => {
         expect(init.body).toBeInstanceOf(Blob);
         expect(await (init.body as Blob).arrayBuffer()).toEqual(bytes.buffer);
         expect(init.headers).toEqual(expect.objectContaining({
-            'Content-Type': 'application/octet-stream',
+            'Content-Type': MIME_TYPES.OCTET_STREAM,
             Accept: 'application/json',
         }));
+    });
+
+    it('should expose MIME helpers for document uploads', () => {
+        expect(MIME_TYPES.MULTIPART_FORM_DATA).toBe('multipart/form-data');
+        expect(MIME_TYPES.OCTET_STREAM).toBe('application/octet-stream');
+        expect(getDocumentMimeType('contract.pdf')).toBe(MIME_TYPES.PDF);
+        expect(getDocumentMimeType('report.DOCX')).toBe(MIME_TYPES.DOCX);
+        expect(getDocumentMimeType('unknown.bin')).toBe(MIME_TYPES.OCTET_STREAM);
+        expect(isMultipartFormData('multipart/form-data; boundary=abc')).toBe(true);
+        expect(shouldSetContentTypeHeader(MIME_TYPES.MULTIPART_FORM_DATA)).toBe(false);
+        expect(shouldSetContentTypeHeader(MIME_TYPES.OCTET_STREAM)).toBe(true);
+    });
+
+    it('should not set multipart Content-Type without a boundary for send()', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'ok' }),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        const formData = new FormData();
+        formData.append('file', new Blob(['raw']), 'document.pdf');
+
+        await als.run(mockAstro, async () => {
+            await api.send('/documents', formData, {
+                contentType: MIME_TYPES.MULTIPART_FORM_DATA,
+            });
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        expect(init.body).toBe(formData);
+        expect(init.headers['Content-Type']).toBeUndefined();
     });
 
     it('should send caller-provided raw bodies through request()', async () => {
@@ -260,7 +303,7 @@ describe('Request body and headers for various methods', () => {
 
         await als.run(mockAstro, async () => {
             await api.uploadFiles('/documents/folder', [
-                { file: new Uint8Array([1, 2, 3]), filename: 'IMG_0702.jpg', name: 'Document 1' },
+                { file: new Uint8Array([1, 2, 3]), filename: 'IMG_0702.pdf', name: 'Document 1', contentType: MIME_TYPES.PDF },
                 { file: new Blob(['b']), filename: 'IMG_0703.jpg', name: 'Image 1' },
             ], {
                 params: { batchId: 'batch-1' },
@@ -274,6 +317,7 @@ describe('Request body and headers for various methods', () => {
 
         const formData = init.body as FormData;
         expect(formData.get('files[0]')).toBeInstanceOf(Blob);
+        expect((formData.get('files[0]') as Blob).type).toBe(MIME_TYPES.PDF);
         expect(formData.get('Name[0]')).toBe('Document 1');
         expect(formData.get('files[1]')).toBeInstanceOf(Blob);
         expect(formData.get('Name[1]')).toBe('Image 1');

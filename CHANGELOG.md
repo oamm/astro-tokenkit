@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.37 - 2026-07-20
+
+- Added exported MIME upload helpers: `MIME_TYPES`, `getDocumentMimeType()`, `normalizeMimeType()`, `isMultipartFormData()`, and `shouldSetContentTypeHeader()`.
+- Updated raw upload handling so bare `multipart/form-data` is not set as a `Content-Type` header without a boundary.
+- Documented MIME helper usage for document, multipart, and octet-stream uploads.
+
 ## 1.0.36 - 2026-07-19
 
 - Updated `uploadFiles()` so the `name` value maps to the server's `Name[index]` multipart field.

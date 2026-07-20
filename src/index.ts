@@ -56,3 +56,11 @@ export {
 // Utilities (for advanced users)
 export { runWithContext, getContextStore } from './client/context';
 export { parseTime, formatTime } from './utils/time';
+export {
+    MIME_TYPES,
+    getDocumentMimeType,
+    isMultipartFormData,
+    normalizeMimeType,
+    shouldSetContentTypeHeader,
+} from './utils/mime';
+export type { KnownMimeType } from './utils/mime';

@@ -2,6 +2,7 @@
 
 import type { AstroCookies } from 'astro';
 import type { AsyncLocalStorage } from 'node:async_hooks';
+import type { KnownMimeType } from './utils/mime';
 
 /**
  * Token bundle returned from auth endpoints
@@ -70,7 +71,7 @@ export interface SendOptions extends RequestOptions {
     /** HTTP method used for the request (default: POST). */
     method?: BodyMethod;
     /** Content-Type header for the raw body. */
-    contentType?: string;
+    contentType?: KnownMimeType | string;
     /** Accept header for the response. */
     accept?: string;
 }
@@ -90,7 +91,7 @@ export interface UploadFileInput {
     /** Multipart field name for the file part. */
     fieldName?: string;
     /** Blob MIME type used when wrapping binary values (default: application/octet-stream). */
-    contentType?: string;
+    contentType?: KnownMimeType | string;
 }
 
 export interface UploadFilesOptions extends UploadFormOptions {

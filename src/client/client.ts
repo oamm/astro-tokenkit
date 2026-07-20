@@ -24,6 +24,7 @@ import {getConfig, getTokenManager} from '../config';
 import {createMiddleware} from '../middleware';
 import {safeFetch} from '../utils/fetch';
 import {logger} from '../utils/logger';
+import {MIME_TYPES, shouldSetContentTypeHeader} from '../utils/mime';
 
 /**
  * API Client
@@ -165,8 +166,8 @@ export class APIClient {
             ...optionHeaders,
         };
 
-        if (contentType && !headers['Content-Type'] && !headers['content-type']) {
-            headers['Content-Type'] = contentType;
+        if (shouldSetContentTypeHeader(contentType) && !headers['Content-Type'] && !headers['content-type']) {
+            headers['Content-Type'] = contentType!;
         }
 
         if (accept && !headers['Accept'] && !headers['accept']) {
@@ -190,9 +191,9 @@ export class APIClient {
         bytes: Blob | ArrayBuffer | ArrayBufferView,
         options?: SendOptions
     ): Promise<APIResponse<T>> {
-        const body = this.toBodyInit(bytes, options?.contentType ?? 'application/octet-stream');
+        const body = this.toBodyInit(bytes, options?.contentType ?? MIME_TYPES.OCTET_STREAM);
         return this.send<T>(url, body, {
-            contentType: 'application/octet-stream',
+            contentType: MIME_TYPES.OCTET_STREAM,
             ...options,
         });
     }
@@ -537,7 +538,7 @@ export class APIClient {
         return this.toBlob(bytes, contentType);
     }
 
-    private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType = 'application/octet-stream'): Blob {
+    private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType: string = MIME_TYPES.OCTET_STREAM): Blob {
         if (bytes instanceof Blob) return bytes;
         return new Blob([bytes as BlobPart], { type: contentType });
     }

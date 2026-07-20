@@ -264,7 +264,10 @@ await api.get('/data', {
 Use `sendBytes()` for `application/octet-stream` requests:
 
 ```typescript
+import { MIME_TYPES } from 'astro-tokenkit';
+
 const { data } = await api.sendBytes('/storage/raw', fileBytes, {
+  contentType: MIME_TYPES.OCTET_STREAM,
   accept: 'application/json',
 });
 ```
@@ -272,6 +275,8 @@ const { data } = await api.sendBytes('/storage/raw', fileBytes, {
 Use `uploadFiles()` for multipart uploads while keeping TokenKit as the single API client for base URL, auth, timeout, retries, and SSL options:
 
 ```typescript
+import { getDocumentMimeType, MIME_TYPES } from 'astro-tokenkit';
+
 const { data } = await api.uploadFiles<Document[]>(
   `/storage/documents/${folder.replace(/:/g, '_')}`,
   documents
@@ -280,6 +285,7 @@ const { data } = await api.uploadFiles<Document[]>(
       file: doc.file,
       name: doc.name || `Document ${index + 1}`,
       filename: doc.filename,
+      contentType: doc.filename ? getDocumentMimeType(doc.filename) : MIME_TYPES.OCTET_STREAM,
     })),
   {
     params: { batchId },
@@ -287,7 +293,13 @@ const { data } = await api.uploadFiles<Document[]>(
 );
 ```
 
-By default, `uploadFiles()` appends each file as `files[index]` and each document name as `Name[index]`. For a prebuilt `FormData` instance, use `uploadForm()`. TokenKit does not set `Content-Type` for multipart requests, allowing `fetch` to include the correct boundary.
+By default, `uploadFiles()` appends each file as `files[index]` and each document name as `Name[index]`. For a prebuilt `FormData` instance, use `uploadForm()`. TokenKit does not set `Content-Type` for multipart requests, allowing `fetch` to include the correct boundary. `MIME_TYPES` and `getDocumentMimeType()` are exported for consistent upload metadata:
+
+```typescript
+import { getDocumentMimeType, MIME_TYPES } from 'astro-tokenkit';
+
+const contentType = getDocumentMimeType(file.name, MIME_TYPES.OCTET_STREAM);
+```
 
 ## Advanced Usage
 
