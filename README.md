@@ -278,7 +278,8 @@ const { data } = await api.uploadFiles<Document[]>(
     .filter(doc => doc.file)
     .map((doc, index) => ({
       file: doc.file,
-      name: doc.name || `file_${index}`,
+      name: doc.name || `Document ${index + 1}`,
+      filename: doc.filename,
     })),
   {
     params: { batchId },
@@ -286,7 +287,7 @@ const { data } = await api.uploadFiles<Document[]>(
 );
 ```
 
-By default, `uploadFiles()` appends each file as `files[index]` and each filename as `Name[index]`. For a prebuilt `FormData` instance, use `uploadForm()`. TokenKit does not set `Content-Type` for multipart requests, allowing `fetch` to include the correct boundary.
+By default, `uploadFiles()` appends each file as `files[index]` and each document name as `Name[index]`. For a prebuilt `FormData` instance, use `uploadForm()`. TokenKit does not set `Content-Type` for multipart requests, allowing `fetch` to include the correct boundary.
 
 ## Advanced Usage
 

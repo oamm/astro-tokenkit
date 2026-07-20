@@ -238,11 +238,12 @@ export class APIClient {
             }
 
             const fieldName = file.fieldName ?? this.resolveUploadField(fileField, file, index);
-            const fileName = file.name ?? `file_${index}`;
+            const fileName = file.filename ?? this.getBlobName(file.file) ?? file.name ?? `file_${index}`;
+            const displayName = file.name ?? fileName;
             formData.append(fieldName, this.toBlob(file.file, file.contentType), fileName);
 
             if (nameField !== undefined && nameField !== false) {
-                formData.append(this.resolveUploadField(nameField, file, index), fileName);
+                formData.append(this.resolveUploadField(nameField, file, index), displayName);
             }
         });
 
@@ -539,6 +540,15 @@ export class APIClient {
     private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType = 'application/octet-stream'): Blob {
         if (bytes instanceof Blob) return bytes;
         return new Blob([bytes as BlobPart], { type: contentType });
+    }
+
+    private getBlobName(file: Blob | ArrayBuffer | ArrayBufferView): string | undefined {
+        if (file instanceof Blob) {
+            const name = (file as Blob & { name?: unknown }).name;
+            return typeof name === 'string' && name ? name : undefined;
+        }
+
+        return undefined;
     }
 
     /**

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.36 - 2026-07-19
+
+- Updated `uploadFiles()` so the `name` value maps to the server's `Name[index]` multipart field.
+- Added `filename` to `UploadFileInput` for controlling the multipart file part filename separately from the document name.
+- Added regression coverage for the Lynx storage upload shape using `files[0]`, `files[1]`, `Name[0]`, and `Name[1]`.
+
 ## 1.0.35 - 2026-07-19
 
 - Added raw request body support through `RequestConfig.body` so callers can send `FormData`, `Blob`, `ArrayBuffer`, and other fetch `BodyInit` payloads without JSON serialization.

@@ -260,8 +260,8 @@ describe('Request body and headers for various methods', () => {
 
         await als.run(mockAstro, async () => {
             await api.uploadFiles('/documents/folder', [
-                { file: new Uint8Array([1, 2, 3]), name: 'a.pdf' },
-                { file: new Blob(['b']), name: 'b.pdf' },
+                { file: new Uint8Array([1, 2, 3]), filename: 'IMG_0702.jpg', name: 'Document 1' },
+                { file: new Blob(['b']), filename: 'IMG_0703.jpg', name: 'Image 1' },
             ], {
                 params: { batchId: 'batch-1' },
             });
@@ -274,8 +274,8 @@ describe('Request body and headers for various methods', () => {
 
         const formData = init.body as FormData;
         expect(formData.get('files[0]')).toBeInstanceOf(Blob);
-        expect(formData.get('Name[0]')).toBe('a.pdf');
+        expect(formData.get('Name[0]')).toBe('Document 1');
         expect(formData.get('files[1]')).toBeInstanceOf(Blob);
-        expect(formData.get('Name[1]')).toBe('b.pdf');
+        expect(formData.get('Name[1]')).toBe('Image 1');
     });
 });

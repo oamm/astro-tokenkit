@@ -83,8 +83,10 @@ export interface UploadFormOptions extends RequestOptions {
 export interface UploadFileInput {
     /** File/blob/binary content to append to FormData. */
     file: Blob | ArrayBuffer | ArrayBufferView;
-    /** Filename sent to the server. */
+    /** Value appended to the companion Name[index] field. */
     name?: string;
+    /** Filename sent in the multipart file part. Defaults to File.name, name, or file_index. */
+    filename?: string;
     /** Multipart field name for the file part. */
     fieldName?: string;
     /** Blob MIME type used when wrapping binary values (default: application/octet-stream). */
