@@ -322,4 +322,53 @@ describe('Request body and headers for various methods', () => {
         expect(formData.get('files[1]')).toBeInstanceOf(Blob);
         expect(formData.get('Name[1]')).toBe('Image 1');
     });
+
+    it('should honor explicit upload file contentType for Blob inputs', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve([{ id: 1 }]),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        await als.run(mockAstro, async () => {
+            await api.uploadFiles('/documents/folder', [
+                {
+                    file: new Blob(['image-bytes'], { type: MIME_TYPES.OCTET_STREAM }),
+                    filename: 'logo.jpg',
+                    contentType: MIME_TYPES.JPEG,
+                },
+            ]);
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        const formData = init.body as FormData;
+        expect((formData.get('files[0]') as Blob).type).toBe(MIME_TYPES.JPEG);
+    });
+
+    it('should preserve Blob type when upload file contentType is omitted', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve([{ id: 1 }]),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        await als.run(mockAstro, async () => {
+            await api.uploadFiles('/documents/folder', [
+                {
+                    file: new Blob(['image-bytes'], { type: MIME_TYPES.PNG }),
+                    filename: 'logo.png',
+                },
+            ]);
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        const formData = init.body as FormData;
+        expect((formData.get('files[0]') as Blob).type).toBe(MIME_TYPES.PNG);
+    });
 });

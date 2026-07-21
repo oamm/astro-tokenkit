@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.38 - 2026-07-21
+
+- Fixed `uploadFiles()` so explicit file `contentType` values are honored for `Blob` and `File` inputs.
+- Preserved existing `Blob.type` values when `uploadFiles()` is called without an explicit file `contentType`.
+- Added regression coverage for multipart file part MIME handling with `Blob` inputs.
+
 ## 1.0.37 - 2026-07-20
 
 - Added exported MIME upload helpers: `MIME_TYPES`, `getDocumentMimeType()`, `normalizeMimeType()`, `isMultipartFormData()`, and `shouldSetContentTypeHeader()`.

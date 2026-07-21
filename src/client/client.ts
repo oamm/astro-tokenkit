@@ -538,9 +538,16 @@ export class APIClient {
         return this.toBlob(bytes, contentType);
     }
 
-    private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType: string = MIME_TYPES.OCTET_STREAM): Blob {
-        if (bytes instanceof Blob) return bytes;
-        return new Blob([bytes as BlobPart], { type: contentType });
+    private toBlob(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType?: string): Blob {
+        if (bytes instanceof Blob) {
+            if (contentType && bytes.type !== contentType) {
+                return new Blob([bytes], { type: contentType });
+            }
+
+            return bytes;
+        }
+
+        return new Blob([bytes as BlobPart], { type: contentType ?? MIME_TYPES.OCTET_STREAM });
     }
 
     private getBlobName(file: Blob | ArrayBuffer | ArrayBufferView): string | undefined {
