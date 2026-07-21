@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.40 - 2026-07-21
+
+- Added sanitized effective request headers to API, network, and timeout errors so multipart upload failures can be diagnosed without exposing authorization or cookie values.
+- Added regression coverage for FormData upload errors with redacted sensitive headers.
+
 ## 1.0.39 - 2026-07-21
 
 - Fixed `FormData` uploads so globally configured `Content-Type` headers are removed before `fetch`, allowing the runtime to set the multipart boundary.

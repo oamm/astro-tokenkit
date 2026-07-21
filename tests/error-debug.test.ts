@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { APIClient, AuthError, NetworkError, runWithContext } from '../src';
+import { APIClient, APIError, AuthError, MIME_TYPES, NetworkError, runWithContext } from '../src';
 import { setConfig } from '../src';
 
 describe('Error Handling and Debug Information', () => {
@@ -69,6 +69,40 @@ describe('Error Handling and Debug Information', () => {
 
         await runWithContext(mockCtx as any, () => client.get('/test'));
         expect(customFetch).toHaveBeenCalled();
+    });
+
+    it('should expose sanitized effective headers on upload API errors', async () => {
+        expect.assertions(4);
+
+        const client = new APIClient({
+            headers: {
+                'Content-Type': MIME_TYPES.JSON,
+                Accept: MIME_TYPES.JSON,
+                Authorization: 'Bearer secret-token',
+            },
+        });
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 415,
+            statusText: 'Unsupported Media Type',
+            headers: new Headers(),
+            text: () => Promise.resolve(''),
+        });
+
+        try {
+            await runWithContext(mockCtx as any, () => client.uploadFiles('/documents', [
+                {
+                    file: new Blob(['image-bytes'], { type: MIME_TYPES.PNG }),
+                    filename: 'logo.png',
+                },
+            ]));
+        } catch (error: any) {
+            expect(error).toBeInstanceOf(APIError);
+            expect(error.request.headers['Content-Type']).toBeUndefined();
+            expect(error.request.headers.Accept).toBe(MIME_TYPES.JSON);
+            expect(error.request.headers.Authorization).toBe('[redacted]');
+        }
     });
 
     it('should set NODE_TLS_REJECT_UNAUTHORIZED when dangerouslyIgnoreCertificateErrors is true', async () => {

@@ -344,6 +344,8 @@ export class APIClient {
             this.removeContentTypeHeader(headers);
         }
 
+        const effectiveRequestConfig = this.withEffectiveHeaders(requestConfig, headers);
+
         // Execute fetch with timeout
         const timeout = requestConfig.timeout ?? this.config.timeout ?? 30000;
         const controller = new AbortController();
@@ -371,7 +373,7 @@ export class APIClient {
             }
 
             // Parse response
-            const apiResponse = await this.parseResponse<T>(response, fullURL, requestConfig);
+            const apiResponse = await this.parseResponse<T>(response, fullURL, effectiveRequestConfig);
 
             // Apply response interceptors
             if (this.config.interceptors?.response) {
@@ -395,14 +397,14 @@ export class APIClient {
 
             // Transform errors
             if (error instanceof Error && error.name === 'AbortError') {
-                throw new TimeoutError(`Request timeout after ${timeout}ms`, requestConfig, error);
+                throw new TimeoutError(`Request timeout after ${timeout}ms`, effectiveRequestConfig, error);
             }
 
             if (error instanceof APIError) {
                 throw error;
             }
 
-            throw new NetworkError((error as Error).message, requestConfig, error);
+            throw new NetworkError((error as Error).message, effectiveRequestConfig, error);
         }
     }
 
@@ -547,6 +549,30 @@ export class APIClient {
                 delete headers[key];
             }
         });
+    }
+
+    private withEffectiveHeaders(config: RequestConfig, headers: Record<string, string>): RequestConfig {
+        return {
+            ...config,
+            headers: this.redactHeaders(headers),
+        };
+    }
+
+    private redactHeaders(headers: Record<string, string>): Record<string, string> {
+        const redacted: Record<string, string> = {};
+        const sensitiveHeaders = new Set([
+            'authorization',
+            'cookie',
+            'set-cookie',
+            'x-api-key',
+            'x-auth-token',
+        ]);
+
+        Object.entries(headers).forEach(([key, value]) => {
+            redacted[key] = sensitiveHeaders.has(key.toLowerCase()) ? '[redacted]' : value;
+        });
+
+        return redacted;
     }
 
     private toBodyInit(bytes: Blob | ArrayBuffer | ArrayBufferView, contentType: string): BodyInit {
