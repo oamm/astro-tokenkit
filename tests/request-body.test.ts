@@ -323,6 +323,40 @@ describe('Request body and headers for various methods', () => {
         expect(formData.get('Name[1]')).toBe('Image 1');
     });
 
+    it('should remove globally configured Content-Type for FormData uploads', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve([{ id: 1 }]),
+            status: 200,
+            statusText: 'OK',
+        });
+        global.fetch = fetchSpy;
+
+        setConfig({
+            baseURL: 'https://api.example.com',
+            context: als,
+            headers: {
+                'Content-Type': MIME_TYPES.JSON,
+                Accept: MIME_TYPES.JSON,
+            },
+        });
+
+        await als.run(mockAstro, async () => {
+            await api.uploadFiles('/documents/folder', [
+                {
+                    file: new Blob(['image-bytes'], { type: MIME_TYPES.PNG }),
+                    filename: 'logo.png',
+                },
+            ]);
+        });
+
+        const [, init] = fetchSpy.mock.calls[0];
+        expect(init.body).toBeInstanceOf(FormData);
+        expect(init.headers['Content-Type']).toBeUndefined();
+        expect(init.headers.Accept).toBe(MIME_TYPES.JSON);
+    });
+
     it('should honor explicit upload file contentType for Blob inputs', async () => {
         const fetchSpy = vi.fn().mockResolvedValue({
             ok: true,

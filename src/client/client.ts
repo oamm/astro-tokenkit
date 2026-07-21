@@ -340,6 +340,10 @@ export class APIClient {
             }
         }
 
+        if (this.isFormDataBody(init.body)) {
+            this.removeContentTypeHeader(headers);
+        }
+
         // Execute fetch with timeout
         const timeout = requestConfig.timeout ?? this.config.timeout ?? 30000;
         const controller = new AbortController();
@@ -529,6 +533,18 @@ export class APIClient {
                 });
             } else {
                 formData.append(key, String(value));
+            }
+        });
+    }
+
+    private isFormDataBody(body: BodyInit | null | undefined): body is FormData {
+        return typeof FormData !== 'undefined' && body instanceof FormData;
+    }
+
+    private removeContentTypeHeader(headers: Record<string, string>): void {
+        Object.keys(headers).forEach((key) => {
+            if (key.toLowerCase() === 'content-type') {
+                delete headers[key];
             }
         });
     }

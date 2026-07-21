@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.39 - 2026-07-21
+
+- Fixed `FormData` uploads so globally configured `Content-Type` headers are removed before `fetch`, allowing the runtime to set the multipart boundary.
+- Added regression coverage for multipart uploads when TokenKit has default JSON headers configured.
+
 ## 1.0.38 - 2026-07-21
 
 - Fixed `uploadFiles()` so explicit file `contentType` values are honored for `Blob` and `File` inputs.
