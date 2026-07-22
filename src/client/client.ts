@@ -3,6 +3,7 @@
 import type {
     APIResponse,
     AuthConfig,
+    AuthOptions,
     ClientConfig,
     LoginOptions,
     RequestConfig,
@@ -663,6 +664,16 @@ export class APIClient {
 
         const context = getContextStore();
         return this.tokenManager.getSessionAsync(context);
+    }
+
+    /**
+     * Get a valid session, refreshing tokens when possible
+     */
+    async getValidSessionAsync(options?: AuthOptions): Promise<Session | null> {
+        if (!this.tokenManager) return null;
+
+        const context = getContextStore();
+        return this.tokenManager.ensure(context, options);
     }
 
 }

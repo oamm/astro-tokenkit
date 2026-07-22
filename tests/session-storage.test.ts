@@ -154,6 +154,46 @@ describe('session token storage', () => {
         });
     });
 
+    it('refreshes expired session tokens from getValidSessionAsync', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const ctx = createSessionContext({
+            tokenkit: {
+                accessToken: 'old-access',
+                refreshToken: 'old-refresh',
+                expiresAt: now - 60,
+                lastRefreshAt: now - 120,
+            },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            url: 'https://api.example.com/refresh',
+            json: () => Promise.resolve({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 }),
+        });
+
+        await runWithContext(ctx as any, async () => {
+            const session = await client.getValidSessionAsync();
+            expect(session?.accessToken).toBe('new-access');
+        });
+
+        expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/refresh', expect.anything());
+        expect(ctx.session.set).toHaveBeenLastCalledWith('tokenkit', expect.objectContaining({
+            accessToken: 'new-access',
+            refreshToken: 'new-refresh',
+        }), expect.anything());
+    });
+
     it('refreshes expired session tokens back into the session', async () => {
         const now = Math.floor(Date.now() / 1000);
         const ctx = createSessionContext({

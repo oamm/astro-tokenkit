@@ -161,7 +161,7 @@ Session storage uses `ctx.session.get/set/delete` and writes the token bundle un
 storage: { type: 'session', key: 'auth_tokens' }
 ```
 
-Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage.
+Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage. To get a valid session and refresh expired tokens when possible, use `await api.getValidSessionAsync()`.
 
 If you are not using Astro's built-in session provider, pass a custom provider:
 

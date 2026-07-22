@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.42 - 2026-07-22
+
+- Added `api.getValidSessionAsync()` for retrieving a valid session while refreshing expired tokens when possible.
+- Added regression coverage for refresh-capable session reads with session-backed token storage.
+- Documented `getValidSessionAsync()` for route code that needs a usable access token.
+
 ## 1.0.41 - 2026-07-22
 
 - Added a targeted error when `getSession()` is used with async session storage, directing callers to `getSessionAsync()`.
