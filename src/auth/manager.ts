@@ -409,6 +409,10 @@ export class TokenManager {
      * Get current session (no refresh)
      */
     getSession(ctx: TokenKitContext): Session | null {
+        if (this.config.storage?.type === 'session') {
+            throw new AuthError('getSession() cannot read async session storage. Use getSessionAsync() when auth.storage.type is "session".', 500);
+        }
+
         const tokens = retrieveCookieTokens(ctx, this.config.cookies);
 
         if (!this.hasRequiredTokens(tokens) || isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {

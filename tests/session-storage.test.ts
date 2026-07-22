@@ -109,6 +109,51 @@ describe('session token storage', () => {
         }));
     });
 
+    it('reads session tokens from getSessionAsync', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const ctx = createSessionContext({
+            tokenkit: {
+                accessToken: 'session-access',
+                refreshToken: 'session-refresh',
+                expiresAt: now + 3600,
+                lastRefreshAt: now,
+                tokenType: 'Bearer',
+            },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        await runWithContext(ctx as any, async () => {
+            await expect(client.getSessionAsync()).resolves.toEqual(expect.objectContaining({
+                accessToken: 'session-access',
+                expiresAt: now + 3600,
+                tokenType: 'Bearer',
+            }));
+        });
+    });
+
+    it('throws a targeted error when getSession is used with session storage', () => {
+        const ctx = createSessionContext();
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        runWithContext(ctx as any, () => {
+            expect(() => client.getSession()).toThrow('Use getSessionAsync()');
+        });
+    });
+
     it('refreshes expired session tokens back into the session', async () => {
         const now = Math.floor(Date.now() / 1000);
         const ctx = createSessionContext({

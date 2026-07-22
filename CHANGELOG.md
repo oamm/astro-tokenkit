@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.41 - 2026-07-22
+
+- Added a targeted error when `getSession()` is used with async session storage, directing callers to `getSessionAsync()`.
+- Added regression coverage for direct session reads through `getSessionAsync()` with session-backed token storage.
+- Documented that session-backed routes should use `await api.getSessionAsync()`.
+
 ## 1.0.40 - 2026-07-21
 
 - Added sanitized effective request headers to API, network, and timeout errors so multipart upload failures can be diagnosed without exposing authorization or cookie values.
