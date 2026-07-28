@@ -325,8 +325,17 @@ export interface IdleConfig {
      * of a global function or window.addEventListener('tk:idle', ...) instead.
      */
     onIdle?: (() => void) | string;
+    /**
+     * Internal callback used by the browser bootstrap when activity is observed.
+     * This is not serialized from astro.config.mjs.
+     */
+    onActivity?: () => void;
     /** Whether to automatically logout on idle (default: true) */
     autoLogout?: boolean;
+    /** Whether active browser sessions should periodically touch Astro middleware so tokens can refresh (default: true) */
+    keepAlive?: boolean;
+    /** Minimum seconds between keepalive requests while the user is active (default: 60) */
+    keepAliveInterval?: number;
     /** Whether to reload the page after automatic logout (default: true) */
     reload?: boolean;
     /** Whether to monitor activity only on the active tab (default: true) */

@@ -161,7 +161,9 @@ Session storage uses `ctx.session.get/set/delete` and writes the token bundle un
 storage: { type: 'session', key: 'auth_tokens' }
 ```
 
-Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage. To get a valid session and refresh expired tokens when possible, use `await api.getValidSessionAsync()`.
+Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage. To get a valid session and refresh expired tokens when possible, use `await api.getValidSessionAsync()`. In multi-page sites, keep the TokenKit middleware enabled so every page request can run the refresh policy before page code reads the session.
+
+`getSessionAsync()` is a read-only helper: it returns `null` for an expired access token, but when a refresh token is still present in Astro session storage it leaves the session record intact so middleware or `getValidSessionAsync()` can renew it.
 
 If you are not using Astro's built-in session provider, pass a custom provider:
 
@@ -187,10 +189,14 @@ Astro TokenKit automatically monitors user inactivity and closes the session acr
 | :--- | :--- | :--- |
 | `timeout` | `number` | **Required.** Inactivity timeout in seconds. |
 | `onIdle` | `Function \| string` | Optional callback when idle timeout is reached. Can be a function or the name of a global function (string). |
-| `autoLogout`| `boolean` | Whether to automatically trigger logout by calling the configured logout endpoint (default: `true`). |
+| `autoLogout`| `boolean` | Whether to automatically mark the Astro session for cleanup and call the configured logout endpoint when available (default: `true`). |
+| `keepAlive` | `boolean` | Whether active browser sessions should periodically touch Astro middleware so tokens can refresh before expiry (default: `true`). |
+| `keepAliveInterval` | `number` | Minimum seconds between activity-triggered keepalive requests (default: `60`). |
 | `reload` | `boolean` | Whether to reload the page after automatic logout (default: `true`). |
 | `activeTabOnly` | `boolean` | Whether to track activity only on the active tab to save CPU/memory (default: `true`). |
 | `alert` | `any` | Custom data to be passed to the `tk:idle` event. Ideal for configuring SweetAlert options. |
+
+While the user remains active, TokenKit sends a throttled same-origin `HEAD` request to the current Astro route. This lets middleware run the normal refresh policy, so tokens can keep rotating in SPAs even when user interaction does not otherwise trigger server navigation or API calls. Set `keepAlive: false` to disable this behavior.
 
 #### Handling Idle Events (e.g. SweetAlert)
 
@@ -348,6 +354,8 @@ const { data: bundle } = await api.login({ username, password }, {
 
 await api.logout();
 ```
+
+If a logout endpoint is configured, `api.logout()` first obtains a valid access token when possible, including refreshing an expired access token with the stored refresh token. It then calls the logout endpoint and clears local TokenKit storage. With Astro session storage, clearing uses `ctx.session.destroy()` when available so the session cookie and stored session data are removed.
 
 ### Using Promises (.then, .catch, .finally)
 

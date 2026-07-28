@@ -138,6 +138,38 @@ describe('session token storage', () => {
         });
     });
 
+    it('does not destroy a refreshable Astro session during read-only expired session checks', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const ctx = createDestroyableSessionContext({
+            tokenkit: {
+                accessToken: 'expired-access',
+                refreshToken: 'refreshable-token',
+                expiresAt: now - 60,
+                lastRefreshAt: now - 120,
+            },
+            user: { id: 'user-1' },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        await runWithContext(ctx as any, async () => {
+            await expect(client.getSessionAsync()).resolves.toBeNull();
+        });
+
+        expect(ctx.session.destroy).not.toHaveBeenCalled();
+        expect(ctx.session.delete).not.toHaveBeenCalled();
+        expect(ctx.store.get('tokenkit')).toEqual(expect.objectContaining({
+            refreshToken: 'refreshable-token',
+        }));
+        expect(ctx.store.get('user')).toEqual({ id: 'user-1' });
+    });
+
     it('throws a targeted error when getSession is used with session storage', () => {
         const ctx = createSessionContext();
         const client = createClient({
@@ -288,6 +320,61 @@ describe('session token storage', () => {
 
         expect(ctx.session.destroy).toHaveBeenCalled();
         expect(ctx.session.delete).not.toHaveBeenCalled();
+        expect(ctx.store.size).toBe(0);
+    });
+
+    it('refreshes an expired session before logout revocation, then destroys the Astro session', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const ctx = createDestroyableSessionContext({
+            tokenkit: {
+                accessToken: 'expired-access',
+                refreshToken: 'old-refresh',
+                expiresAt: now - 60,
+                lastRefreshAt: now - 120,
+            },
+            user: { id: 'user-1' },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                logout: '/logout',
+                storage: { type: 'session' },
+            },
+        });
+
+        global.fetch = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                headers: new Headers(),
+                url: 'https://api.example.com/refresh',
+                json: () => Promise.resolve({
+                    access_token: 'fresh-access',
+                    refresh_token: 'fresh-refresh',
+                    expires_in: 3600,
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+            });
+
+        await runWithContext(ctx as any, async () => {
+            await client.logout();
+        });
+
+        expect(global.fetch).toHaveBeenNthCalledWith(1, 'https://api.example.com/refresh', expect.anything());
+        expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://api.example.com/logout', expect.objectContaining({
+            method: 'POST',
+            headers: expect.objectContaining({
+                Authorization: 'Bearer fresh-access',
+            }),
+        }));
+        expect(ctx.session.destroy).toHaveBeenCalled();
         expect(ctx.store.size).toBe(0);
     });
 

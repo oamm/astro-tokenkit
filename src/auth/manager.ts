@@ -374,7 +374,7 @@ export class TokenManager {
 
             try {
                 const url = this.joinURL(this.baseURL, this.config.logout);
-                const session = await this.getSessionAsync(ctx);
+                const session = await this.ensure(ctx);
                 const headers: Record<string, string> = {};
 
                 if (session?.accessToken) {
@@ -429,8 +429,15 @@ export class TokenManager {
     async getSessionAsync(ctx: TokenKitContext): Promise<Session | null> {
         const tokens = await this.retrieveTokens(ctx);
 
-        if (!this.hasRequiredTokens(tokens) || isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
+        if (!this.hasRequiredTokens(tokens)) {
             await this.clearTokens(ctx);
+            return null;
+        }
+
+        if (isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
+            if (this.config.storage?.type !== 'session' || !tokens.refreshToken) {
+                await this.clearTokens(ctx);
+            }
             return null;
         }
 

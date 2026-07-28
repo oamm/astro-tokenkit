@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.43 - 2026-07-28
+
+- Preserve refreshable Astro session-backed token records during read-only expired session checks so middleware or `getValidSessionAsync()` can renew them instead of destroying the full session.
+- Refresh expired session-backed tokens before `api.logout()` calls the configured logout endpoint, then destroy the local Astro session after revocation.
+- Mark idle logout for server-side cleanup even when no remote logout endpoint is configured.
+- Add throttled active-session keepalive requests so active multi-page and SPA sessions continue reaching Astro middleware for token refresh.
+- Documented session-backed multi-page usage, idle keepalive options, and logout termination behavior.
+- Added regression coverage for session-backed read-only expiry checks, logout revocation after refresh, idle cleanup marking, and active keepalive throttling.
+
 ## 1.0.42 - 2026-07-22
 
 - Added `api.getValidSessionAsync()` for retrieving a valid session while refreshing expired tokens when possible.

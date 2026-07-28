@@ -8,6 +8,7 @@ export class IdleManager {
     private channel: BroadcastChannel | null = null;
     private timeout: number;
     private onIdle: () => void;
+    private onActivity?: () => void;
     private activeTabOnly: boolean;
     private rafId: number | null = null;
     private lastCheck = 0;
@@ -27,6 +28,7 @@ export class IdleManager {
         this.config = config;
         this.timeout = config.timeout;
         this.activeTabOnly = config.activeTabOnly ?? true;
+        this.onActivity = config.onActivity;
         this.expiredTimeKey = '_tk_idle_expires';
         this.eventHandler = this.reportActivity.bind(this);
         this.navigationHandler = this.handleNavigation.bind(this);
@@ -209,6 +211,7 @@ export class IdleManager {
         
         this.lastActivity = now;
         this.updateExpiredTimeLocal();
+        this.onActivity?.();
         
         if (this.channel) {
             this.channel.postMessage('activity');

@@ -110,6 +110,20 @@ describe('IdleManager', () => {
         manager.cleanup();
     });
 
+    it('should call onActivity when activity is reported', () => {
+        const onActivity = vi.fn();
+        const manager = new IdleManager({ timeout: 60, onIdle, onActivity });
+
+        const addEventListenerCalls = vi.mocked((global as any).window.addEventListener).mock.calls;
+        const mouseMoveHandler = addEventListenerCalls.find((call: any) => call[0] === 'mousemove')?.[1] as Function;
+
+        vi.advanceTimersByTime(1000);
+        mouseMoveHandler();
+
+        expect(onActivity).toHaveBeenCalledTimes(1);
+        manager.cleanup();
+    });
+
     it('should sync activity from other tabs', () => {
         const timeout = 60;
         const manager = new IdleManager({ timeout, onIdle });
