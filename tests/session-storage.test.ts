@@ -138,6 +138,53 @@ describe('session token storage', () => {
         });
     });
 
+    it('does not destroy an empty Astro session when middleware checks for TokenKit auth', async () => {
+        const ctx = createDestroyableSessionContext({
+            sessionkit: { userId: null },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+        global.fetch = vi.fn();
+
+        await runWithContext(ctx as any, async () => {
+            const session = await client.tokenManager?.ensure(ctx as any);
+            expect(session).toBeNull();
+        });
+
+        expect(ctx.session.destroy).not.toHaveBeenCalled();
+        expect(ctx.session.delete).not.toHaveBeenCalled();
+        expect(ctx.store.get('sessionkit')).toEqual({ userId: null });
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not destroy an empty Astro session during read-only session checks', async () => {
+        const ctx = createDestroyableSessionContext({
+            sessionkit: { userId: null },
+        });
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+                storage: { type: 'session' },
+            },
+        });
+
+        await runWithContext(ctx as any, async () => {
+            await expect(client.getSessionAsync()).resolves.toBeNull();
+        });
+
+        expect(ctx.session.destroy).not.toHaveBeenCalled();
+        expect(ctx.session.delete).not.toHaveBeenCalled();
+        expect(ctx.store.get('sessionkit')).toEqual({ userId: null });
+    });
+
     it('does not destroy a refreshable Astro session during read-only expired session checks', async () => {
         const now = Math.floor(Date.now() / 1000);
         const ctx = createDestroyableSessionContext({

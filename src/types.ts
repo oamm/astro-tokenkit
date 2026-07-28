@@ -332,7 +332,7 @@ export interface IdleConfig {
     onActivity?: () => void;
     /** Whether to automatically logout on idle (default: true) */
     autoLogout?: boolean;
-    /** Whether active browser sessions should periodically touch Astro middleware so tokens can refresh (default: true) */
+    /** Whether active browser sessions should periodically touch Astro middleware so tokens can refresh (default: false) */
     keepAlive?: boolean;
     /** Minimum seconds between keepalive requests while the user is active (default: 60) */
     keepAliveInterval?: number;

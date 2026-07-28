@@ -297,6 +297,11 @@ export class TokenManager {
                 };
             }
 
+            if (this.isSessionStorage() && !this.hasAnyTokenData(tokens)) {
+                logger.debug('[TokenKit] No TokenKit session found, skipping refresh', !!this.config.debug);
+                return null;
+            }
+
             logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
             await this.clearTokens(ctx);
             if (this.config.onSessionInvalid) {
@@ -430,6 +435,10 @@ export class TokenManager {
         const tokens = await this.retrieveTokens(ctx);
 
         if (!this.hasRequiredTokens(tokens)) {
+            if (this.isSessionStorage() && !this.hasAnyTokenData(tokens)) {
+                return null;
+            }
+
             await this.clearTokens(ctx);
             return null;
         }
@@ -478,6 +487,20 @@ export class TokenManager {
 
     private clearTokens(ctx: TokenKitContext): Promise<void> {
         return clearTokens(ctx, this.config.cookies, this.config.storage);
+    }
+
+    private isSessionStorage(): boolean {
+        return this.config.storage?.type === 'session';
+    }
+
+    private hasAnyTokenData(tokens: {
+        accessToken: string | null;
+        refreshToken: string | null;
+        expiresAt: number | null;
+        lastRefreshAt?: number | null;
+        tokenType?: string | null;
+    }): boolean {
+        return !!(tokens.accessToken || tokens.refreshToken || tokens.expiresAt || tokens.lastRefreshAt || tokens.tokenType);
     }
 
     private hasRequiredTokens(tokens: {

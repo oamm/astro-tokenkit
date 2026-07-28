@@ -97,6 +97,7 @@ describe('client init idle logout', () => {
             },
             idle: {
                 timeout: 300,
+                keepAlive: true,
                 keepAliveInterval: 60,
             },
         };
@@ -119,5 +120,23 @@ describe('client init idle logout', () => {
             credentials: 'include',
             cache: 'no-store',
         });
+    });
+
+    it('does not touch Astro middleware on activity unless keepalive is enabled', async () => {
+        (globalThis as any).__TOKENKIT_CONFIG__ = {
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+            },
+            idle: {
+                timeout: 300,
+            },
+        };
+
+        await import('../src/client/tk-client');
+
+        idleManagerMock.mock.calls[0][0].onActivity();
+
+        expect(fetch).not.toHaveBeenCalled();
     });
 });

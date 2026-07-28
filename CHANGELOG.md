@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.44 - 2026-07-28
+
+- Prevent session-backed middleware checks from destroying or mutating Astro sessions when no TokenKit token record exists.
+- Treat empty session-backed TokenKit state as anonymous instead of malformed, while still clearing malformed partial token records.
+- Make browser activity keepalive opt-in with `idle.keepAlive: true` so multi-page sites do not create extra same-origin requests on login or public pages.
+- Documented the safer keepalive default and added regression coverage for empty session-backed auth checks and opt-in keepalive behavior.
+
 ## 1.0.43 - 2026-07-28
 
 - Preserve refreshable Astro session-backed token records during read-only expired session checks so middleware or `getValidSessionAsync()` can renew them instead of destroying the full session.

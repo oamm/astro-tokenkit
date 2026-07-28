@@ -190,13 +190,13 @@ Astro TokenKit automatically monitors user inactivity and closes the session acr
 | `timeout` | `number` | **Required.** Inactivity timeout in seconds. |
 | `onIdle` | `Function \| string` | Optional callback when idle timeout is reached. Can be a function or the name of a global function (string). |
 | `autoLogout`| `boolean` | Whether to automatically mark the Astro session for cleanup and call the configured logout endpoint when available (default: `true`). |
-| `keepAlive` | `boolean` | Whether active browser sessions should periodically touch Astro middleware so tokens can refresh before expiry (default: `true`). |
+| `keepAlive` | `boolean` | Whether active browser sessions should periodically touch Astro middleware so tokens can refresh before expiry (default: `false`). Useful for SPA-style screens with little or no server navigation. |
 | `keepAliveInterval` | `number` | Minimum seconds between activity-triggered keepalive requests (default: `60`). |
 | `reload` | `boolean` | Whether to reload the page after automatic logout (default: `true`). |
 | `activeTabOnly` | `boolean` | Whether to track activity only on the active tab to save CPU/memory (default: `true`). |
 | `alert` | `any` | Custom data to be passed to the `tk:idle` event. Ideal for configuring SweetAlert options. |
 
-While the user remains active, TokenKit sends a throttled same-origin `HEAD` request to the current Astro route. This lets middleware run the normal refresh policy, so tokens can keep rotating in SPAs even when user interaction does not otherwise trigger server navigation or API calls. Set `keepAlive: false` to disable this behavior.
+For SPA-style screens, set `keepAlive: true` to send a throttled same-origin `HEAD` request to the current Astro route while the user remains active. This lets middleware run the normal refresh policy even when user interaction does not otherwise trigger server navigation or API calls. Multi-page sites usually do not need this because normal page requests already reach middleware.
 
 #### Handling Idle Events (e.g. SweetAlert)
 

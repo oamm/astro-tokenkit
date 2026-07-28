@@ -30,7 +30,7 @@ function reloadAfterIdle(config: any) {
 }
 
 function touchAstroSession(config: any) {
-    if (!config.auth || config.idle.keepAlive === false) return;
+    if (!config.auth || config.idle.keepAlive !== true) return;
 
     const interval = Math.max(1, config.idle.keepAliveInterval ?? DEFAULT_KEEPALIVE_INTERVAL_SECONDS) * 1000;
     const now = Date.now();
