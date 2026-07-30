@@ -4,7 +4,7 @@ import {APIResponse, AuthError} from '../types';
 import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, retrieveCookieTokens, clearTokens, clearCookieTokens } from './storage';
-import { shouldRefresh, isExpired } from './policy';
+import { normalizePolicy, shouldRefresh, isExpired } from './policy';
 import { safeFetch } from '../utils/fetch';
 import { logger } from '../utils/logger';
 
@@ -160,24 +160,40 @@ export class TokenManager {
      */
     async refresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, headers?: Record<string, string>): Promise<TokenBundle | null> {
         const flightKey = this.createFlightKey(refreshToken);
+        this.debugRefresh('refresh requested', {
+            refreshToken: this.describeToken(refreshToken),
+            extraHeaderKeys: headers ? Object.keys(headers) : [],
+            hasOptionData: !!options?.data,
+            timeout: options?.timeout ?? this.config.timeout ?? 30000,
+        });
         return this.singleFlight.execute(flightKey, async () => {
-            logger.debug('[TokenKit] Starting token refresh', !!this.config.debug);
+            this.debugRefresh('single-flight execution started', {
+                refreshToken: this.describeToken(refreshToken),
+            });
             try {
                 const bundle = await this.performRefresh(ctx, refreshToken, options, headers);
                 if (bundle) {
+                    this.debugRefresh('refresh succeeded', this.describeBundle(bundle));
                     if (this.config.onRefresh) {
+                        this.debugRefresh('calling onRefresh callback');
                         await this.config.onRefresh(bundle, ctx);
                     }
                 } else {
-                    logger.debug('[TokenKit] Token refresh returned no bundle (invalid or expired)', !!this.config.debug);
+                    this.debugRefresh('refresh returned no bundle (invalid or expired)');
                     if (this.config.onRefreshError) {
+                        this.debugRefresh('calling onRefreshError callback after empty refresh result');
                         await this.config.onRefreshError(new AuthError('Refresh token invalid or expired', 401), ctx);
                     }
                 }
                 return bundle;
             } catch (error: any) {
-                logger.debug(`[TokenKit] Token refresh failed: ${error.message}`, !!this.config.debug);
+                this.debugRefresh('refresh failed', {
+                    message: error.message,
+                    status: error.status,
+                    name: error.name,
+                });
                 if (this.config.onRefreshError) {
+                    this.debugRefresh('calling onRefreshError callback after thrown refresh error');
                     await this.config.onRefreshError(error, ctx);
                 }
                 throw error;
@@ -204,6 +220,7 @@ export class TokenManager {
             ...options?.data,
             [refreshField]: refreshToken,
         };
+        const sanitizedDataKeys = Object.keys(data).map((key) => key === refreshField ? `${key}=[redacted]` : key);
 
         let requestBody: string;
         if (contentType === 'application/x-www-form-urlencoded') {
@@ -216,7 +233,17 @@ export class TokenManager {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+        this.debugRefresh('sending refresh request', {
+            url,
+            contentType,
+            timeout,
+            refreshField,
+            bodyKeys: sanitizedDataKeys,
+            headerKeys: Object.keys(headers),
+        });
+
         let response: Response;
+        const startedAt = Date.now();
         try {
             response = await safeFetch(url, {
                 method: 'POST',
@@ -225,14 +252,31 @@ export class TokenManager {
                 signal: controller.signal,
             }, this.config);
         } catch (error: any) {
+            this.debugRefresh('refresh request threw before response', {
+                elapsedMs: Date.now() - startedAt,
+                message: error.message,
+                name: error.name,
+            });
             throw new AuthError(`Refresh request failed: ${error.message}`, undefined, undefined, undefined, error);
         } finally {
             clearTimeout(timeoutId);
         }
 
+        this.debugRefresh('refresh response received', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            url: response.url,
+            elapsedMs: Date.now() - startedAt,
+        });
+
         if (!response.ok) {
             // 400 (Bad Request), 401 (Unauthorized) or 403 (Forbidden) = invalid refresh token
             if (response.status === 400 || response.status === 401 || response.status === 403) {
+                this.debugRefresh('refresh token rejected by auth server, clearing stored tokens', {
+                    status: response.status,
+                    statusText: response.statusText,
+                });
                 await this.clearTokens(ctx);
                 return null;
             }
@@ -240,6 +284,10 @@ export class TokenManager {
         }
 
         const body = await response.json().catch(() => ({}));
+        this.debugRefresh('refresh response body parsed', {
+            parser: this.config.parseRefresh ? 'custom' : 'auto-detect',
+            bodyKeys: body && typeof body === 'object' ? Object.keys(body) : [],
+        });
 
         // Parse response
         let bundle: TokenBundle | null;
@@ -248,21 +296,41 @@ export class TokenManager {
                 ? this.config.parseRefresh(body)
                 : autoDetectFields(body, this.config.fields);
         } catch (error: any) {
+            this.debugRefresh('refresh response parsing failed', {
+                message: error.message,
+                bodyKeys: body && typeof body === 'object' ? Object.keys(body) : [],
+            });
             throw new AuthError(`Invalid refresh response: ${error.message}`, response.status, response);
         }
 
         if (!bundle) {
+            this.debugRefresh('refresh parser returned null/empty bundle, clearing stored tokens');
             await this.clearTokens(ctx);
             return null;
         }
 
+        this.debugRefresh('refresh bundle parsed', this.describeBundle(bundle));
+
         // Validate bundle
         if (!bundle.accessToken || !bundle.refreshToken || !bundle.accessExpiresAt) {
+            this.debugRefresh('refresh bundle validation failed', {
+                hasAccessToken: !!bundle.accessToken,
+                hasRefreshToken: !!bundle.refreshToken,
+                hasAccessExpiresAt: !!bundle.accessExpiresAt,
+            });
             throw new AuthError('Invalid token bundle returned from refresh endpoint', response.status, response);
         }
 
         // Store new tokens
+        this.debugRefresh('storing refreshed tokens', {
+            storage: this.getStorageType(),
+            accessExpiresAt: bundle.accessExpiresAt,
+            secondsUntilExpiry: bundle.accessExpiresAt - Math.floor(Date.now() / 1000),
+        });
         await this.storeTokens(ctx, bundle);
+        this.debugRefresh('refreshed tokens stored', {
+            storage: this.getStorageType(),
+        });
 
         return bundle;
     }
@@ -273,21 +341,34 @@ export class TokenManager {
     async ensure(ctx: TokenKitContext, options?: AuthOptions, headers?: Record<string, string>, force: boolean = false): Promise<Session | null> {
         const now = Math.floor(Date.now() / 1000);
         const tokens = await this.retrieveTokens(ctx);
+        const policy = normalizePolicy(this.config.policy);
+
+        this.debugRefresh('ensure started', {
+            force,
+            now,
+            storage: this.getStorageType(),
+            policy,
+            tokens: this.describeStoredTokens(tokens, now),
+        });
 
         // Refresh-token-only records can happen after the browser drops short-lived
         // access-token cookies. They are still refreshable and should not be
         // treated as an invalid app session.
         if (!this.hasRequiredTokens(tokens)) {
+            this.debugRefresh('stored token record is incomplete', {
+                tokens: this.describeStoredTokens(tokens, now),
+            });
             if (tokens.refreshToken) {
-                logger.debug('[TokenKit] Access token data missing, attempting refresh with refresh token', !!this.config.debug);
+                this.debugRefresh('access token data missing, attempting refresh with refresh token');
                 const bundle = await this.refresh(ctx, tokens.refreshToken, options, headers);
 
                 if (!bundle) {
-                    logger.debug('[TokenKit] Refresh returned no bundle, session lost', !!this.config.debug);
+                    this.debugRefresh('refresh returned no bundle, session lost');
                     return null;
                 }
 
                 await this.storeTokens(ctx, bundle);
+                this.debugRefresh('ensure returning refreshed session from incomplete token record', this.describeBundle(bundle));
 
                 return {
                     accessToken: bundle.accessToken,
@@ -298,13 +379,14 @@ export class TokenManager {
             }
 
             if (this.isSessionStorage() && !this.hasAnyTokenData(tokens)) {
-                logger.debug('[TokenKit] No TokenKit session found, skipping refresh', !!this.config.debug);
+                this.debugRefresh('no TokenKit session found, skipping refresh');
                 return null;
             }
 
-            logger.debug('[TokenKit] No valid session found, refresh impossible', !!this.config.debug);
+            this.debugRefresh('no valid session found, refresh impossible');
             await this.clearTokens(ctx);
             if (this.config.onSessionInvalid) {
+                this.debugRefresh('calling onSessionInvalid callback');
                 await this.config.onSessionInvalid(new AuthError('No valid session found, refresh impossible', 401), ctx);
             }
             return null;
@@ -312,17 +394,24 @@ export class TokenManager {
 
         // Token expired or force refresh
         const expired = isExpired(tokens.expiresAt, now, this.config.policy);
+        this.debugRefresh('token expiry evaluated', {
+            force,
+            expired,
+            secondsUntilExpiry: tokens.expiresAt - now,
+            adjustedSecondsUntilExpiry: tokens.expiresAt - (now + Number(policy.clockSkew)),
+        });
         if (force || expired) {
-            logger.debug(`[TokenKit] Token ${force ? 'force refresh' : 'expired'}, refreshing...`, !!this.config.debug);
+            this.debugRefresh(force ? 'force refresh requested' : 'token expired, refreshing');
             const bundle = await this.refresh(ctx, tokens.refreshToken!, options, headers);
 
             if (!bundle) {
-                logger.debug('[TokenKit] Refresh returned no bundle, session lost', !!this.config.debug);
+                this.debugRefresh('refresh returned no bundle, session lost');
                 return null;
             }
 
             // Ensure tokens are stored in the current context (in case of shared flight)
             await this.storeTokens(ctx, bundle);
+            this.debugRefresh('ensure returning refreshed session after expired/forced refresh', this.describeBundle(bundle));
 
             return {
                 accessToken: bundle.accessToken,
@@ -333,14 +422,22 @@ export class TokenManager {
         }
 
         // Proactive refresh
-        if (shouldRefresh(tokens.expiresAt, now, tokens.lastRefreshAt, this.config.policy)) {
-            logger.debug('[TokenKit] Token near expiration, performing proactive refresh', !!this.config.debug);
+        const proactive = shouldRefresh(tokens.expiresAt, now, tokens.lastRefreshAt, this.config.policy);
+        this.debugRefresh('proactive refresh evaluated', {
+            proactive,
+            secondsUntilExpiry: tokens.expiresAt - now,
+            secondsSinceLastRefresh: tokens.lastRefreshAt === null ? null : now - tokens.lastRefreshAt,
+            refreshBefore: policy.refreshBefore,
+            minInterval: policy.minInterval,
+        });
+        if (proactive) {
+            this.debugRefresh('token near expiration, performing proactive refresh');
 
             try {
                 const bundle = await this.refresh(ctx, tokens.refreshToken!, options, headers);
 
                 if (bundle) {
-                    logger.debug('[TokenKit] Proactive refresh successful', !!this.config.debug);
+                    this.debugRefresh('proactive refresh successful', this.describeBundle(bundle));
                     // Ensure tokens are stored in the current context (in case of shared flight)
                     await this.storeTokens(ctx, bundle);
 
@@ -352,18 +449,29 @@ export class TokenManager {
                     };
                 }
             } catch (error) {
-                logger.debug(`[TokenKit] Proactive refresh failed: ${(error as Error).message}. Continuing with current token.`, !!this.config.debug);
+                this.debugRefresh('proactive refresh failed, continuing with current token', {
+                    message: (error as Error).message,
+                });
             }
 
             // Refresh failed or returned no bundle, check if tokens still exist
             const currentTokens = await this.retrieveTokens(ctx);
+            this.debugRefresh('tokens after failed proactive refresh', {
+                tokens: this.describeStoredTokens(currentTokens, Math.floor(Date.now() / 1000)),
+            });
             if (!this.hasRequiredTokens(currentTokens)) {
+                this.debugRefresh('tokens missing after failed proactive refresh, clearing auth state');
                 await this.clearTokens(ctx);
                 return null;
             }
         }
 
         // Return current session
+        this.debugRefresh('ensure returning existing session', {
+            expiresAt: tokens.expiresAt,
+            secondsUntilExpiry: tokens.expiresAt - now,
+            tokenType: tokens.tokenType ?? undefined,
+        });
         return this.toSession(tokens);
     }
 
@@ -491,6 +599,59 @@ export class TokenManager {
 
     private isSessionStorage(): boolean {
         return this.config.storage?.type === 'session';
+    }
+
+    private getStorageType(): 'cookie' | 'session' {
+        return this.config.storage?.type ?? 'cookie';
+    }
+
+    private debugRefresh(message: string, details?: Record<string, any>): void {
+        if (details) {
+            logger.debug(`[TokenKit][refresh] ${message}`, !!this.config.debug, details);
+            return;
+        }
+
+        logger.debug(`[TokenKit][refresh] ${message}`, !!this.config.debug);
+    }
+
+    private describeToken(token: string | null | undefined): Record<string, any> {
+        return {
+            present: !!token,
+            length: token?.length ?? 0,
+        };
+    }
+
+    private describeBundle(bundle: Partial<TokenBundle>): Record<string, any> {
+        const now = Math.floor(Date.now() / 1000);
+        return {
+            accessToken: this.describeToken(bundle.accessToken),
+            refreshToken: this.describeToken(bundle.refreshToken),
+            accessExpiresAt: bundle.accessExpiresAt,
+            secondsUntilExpiry: bundle.accessExpiresAt ? bundle.accessExpiresAt - now : null,
+            refreshExpiresAt: bundle.refreshExpiresAt,
+            secondsUntilRefreshExpiry: bundle.refreshExpiresAt ? bundle.refreshExpiresAt - now : null,
+            tokenType: bundle.tokenType,
+            hasSessionPayload: !!bundle.sessionPayload,
+        };
+    }
+
+    private describeStoredTokens(tokens: {
+        accessToken: string | null;
+        refreshToken: string | null;
+        expiresAt: number | null;
+        lastRefreshAt?: number | null;
+        tokenType?: string | null;
+    }, now: number): Record<string, any> {
+        return {
+            accessToken: this.describeToken(tokens.accessToken),
+            refreshToken: this.describeToken(tokens.refreshToken),
+            expiresAt: tokens.expiresAt,
+            secondsUntilExpiry: tokens.expiresAt === null ? null : tokens.expiresAt - now,
+            lastRefreshAt: tokens.lastRefreshAt ?? null,
+            secondsSinceLastRefresh: tokens.lastRefreshAt == null ? null : now - tokens.lastRefreshAt,
+            tokenType: tokens.tokenType ?? null,
+            hasRequiredTokens: !!(tokens.accessToken && tokens.refreshToken && tokens.expiresAt),
+        };
     }
 
     private hasAnyTokenData(tokens: {

@@ -175,4 +175,43 @@ describe('TokenManager token validity', () => {
         expect(Number(ctx.store.get('access_expires_at'))).toBeGreaterThan(now);
         expect(ctx.cookies.delete).not.toHaveBeenCalled();
     });
+
+    it('logs detailed refresh diagnostics without exposing raw token values', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const debugManager = new TokenManager({
+            ...config,
+            debug: true,
+        }, 'https://api.example.com');
+        const ctx = createCookieContext({
+            access_token: 'old-access-secret',
+            refresh_token: 'old-refresh-secret',
+            access_expires_at: String(now - 60),
+            last_refresh_at: String(now - 120),
+        });
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            url: 'https://api.example.com/refresh',
+            json: () => Promise.resolve({
+                access_token: 'new-access-secret',
+                refresh_token: 'new-refresh-secret',
+                expires_in: 3600,
+            }),
+        });
+
+        await debugManager.ensure(ctx as any);
+        const serializedLogs = spy.mock.calls.flat().map((entry) => JSON.stringify(entry)).join('\n');
+        spy.mockRestore();
+
+        expect(serializedLogs).toContain('[TokenKit][refresh] ensure started');
+        expect(serializedLogs).toContain('[TokenKit][refresh] refresh response received');
+        expect(serializedLogs).not.toContain('old-access-secret');
+        expect(serializedLogs).not.toContain('old-refresh-secret');
+        expect(serializedLogs).not.toContain('new-access-secret');
+        expect(serializedLogs).not.toContain('new-refresh-secret');
+    });
 });

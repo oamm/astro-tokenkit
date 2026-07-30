@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.45 - 2026-07-30
+
+- Added detailed debug diagnostics throughout the token refresh flow, including storage state, expiry timing, policy decisions, request/response timing, parser status, and token persistence events.
+- Kept refresh diagnostics sanitized by logging token presence and length instead of raw access or refresh token values.
+- Added regression coverage to ensure refresh debug logs do not expose raw token values.
+
 ## 1.0.44 - 2026-07-28
 
 - Prevent session-backed middleware checks from destroying or mutating Astro sessions when no TokenKit token record exists.
