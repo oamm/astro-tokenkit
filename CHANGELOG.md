@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.47 - 2026-08-01
+
+- Added ISO timestamps to TokenKit logger output using the `[TokenKit] [timestamp]` prefix format.
+- Preserved debug gating, scoped log labels such as `[refresh]` and `[auth]`, and sanitized log details.
+- Added regression coverage for timestamped logger output.
+
 ## 1.0.46 - 2026-08-01
 
 - Added configurable login and refresh URL query parameters with `auth.loginParams`, `auth.refreshParams`, and per-request `params` overrides.

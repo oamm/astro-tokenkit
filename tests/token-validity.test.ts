@@ -207,8 +207,8 @@ describe('TokenManager token validity', () => {
         const serializedLogs = spy.mock.calls.flat().map((entry) => JSON.stringify(entry)).join('\n');
         spy.mockRestore();
 
-        expect(serializedLogs).toContain('[TokenKit][refresh] ensure started');
-        expect(serializedLogs).toContain('[TokenKit][refresh] refresh response received');
+        expect(serializedLogs).toMatch(/\[TokenKit\] \[[^\]]+\] \[refresh\] ensure started/);
+        expect(serializedLogs).toMatch(/\[TokenKit\] \[[^\]]+\] \[refresh\] refresh response received/);
         expect(serializedLogs).not.toContain('old-access-secret');
         expect(serializedLogs).not.toContain('old-refresh-secret');
         expect(serializedLogs).not.toContain('new-access-secret');
@@ -232,7 +232,7 @@ describe('TokenManager token validity', () => {
         const serializedLogs = spy.mock.calls.flat().map((entry) => JSON.stringify(entry)).join('\n');
         spy.mockRestore();
 
-        expect(serializedLogs).toContain('[TokenKit][auth] getSession found expired token, clearing auth state');
+        expect(serializedLogs).toMatch(/\[TokenKit\] \[[^\]]+\] \[auth\] getSession found expired token, clearing auth state/);
         expect(serializedLogs).toContain('secondsUntilExpiry');
         expect(serializedLogs).toContain('adjustedSecondsUntilExpiry');
         expect(serializedLogs).not.toContain('expired-access-secret');

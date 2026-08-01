@@ -29,7 +29,7 @@ describe('Middleware Logging', () => {
 
         await middleware(mockCtx, next);
 
-        expect(spy).toHaveBeenCalledWith(expect.stringContaining('[TokenKit] Middleware initialized (auth: disabled, context: default)'));
+        expect(spy).toHaveBeenCalledWith(expect.stringMatching(/^\[TokenKit\] \[[^\]]+\] Middleware initialized \(auth: disabled, context: default\)$/));
         spy.mockRestore();
     });
 
@@ -50,7 +50,7 @@ describe('Middleware Logging', () => {
 
         await middleware(mockCtx, next);
 
-        expect(spy).toHaveBeenCalledWith(expect.stringContaining('[TokenKit] Middleware initialized (auth: enabled, context: custom (getter/setter))'));
+        expect(spy).toHaveBeenCalledWith(expect.stringMatching(/^\[TokenKit\] \[[^\]]+\] Middleware initialized \(auth: enabled, context: custom \(getter\/setter\)\)$/));
         spy.mockRestore();
     });
 
@@ -69,7 +69,7 @@ describe('Middleware Logging', () => {
 
         await middleware(mockCtx, next);
 
-        expect(spy).toHaveBeenCalledWith(expect.stringContaining('[TokenKit] Middleware initialized (auth: disabled, context: custom (runWithContext))'));
+        expect(spy).toHaveBeenCalledWith(expect.stringMatching(/^\[TokenKit\] \[[^\]]+\] Middleware initialized \(auth: disabled, context: custom \(runWithContext\)\)$/));
         spy.mockRestore();
     });
 
