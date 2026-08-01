@@ -75,7 +75,11 @@ export class TokenManager {
      * Perform login
      */
     async login(ctx: TokenKitContext, credentials: any, options?: LoginOptions): Promise<APIResponse<TokenBundle>> {
-        const url = this.joinURL(this.baseURL, this.config.login);
+        const url = this.withQueryParams(
+            this.joinURL(this.baseURL, this.config.login),
+            this.config.loginParams,
+            options?.params
+        );
 
         const contentType = this.config.contentType || 'application/json';
         const headers: Record<string, string> = {
@@ -101,7 +105,17 @@ export class TokenManager {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+        this.debugAuth('sending login request', {
+            url,
+            contentType,
+            timeout,
+            bodyKeys: Object.keys(data),
+            headerKeys: Object.keys(headers),
+            queryParamKeys: this.getMergedParamKeys(this.config.loginParams, options?.params),
+        });
+
         let response: Response;
+        const startedAt = Date.now();
         try {
             response = await safeFetch(url, {
                 method: 'POST',
@@ -110,12 +124,25 @@ export class TokenManager {
                 signal: controller.signal,
             }, this.config);
         } catch (error: any) {
+            this.debugAuth('login request threw before response', {
+                elapsedMs: Date.now() - startedAt,
+                message: error.message,
+                name: error.name,
+            });
             const authError = new AuthError(`Login request failed: ${error.message}`, undefined, undefined, undefined, error);
             if (options?.onError) await options.onError(authError, ctx);
             throw authError;
         } finally {
             clearTimeout(timeoutId);
         }
+
+        this.debugAuth('login response received', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            url: response.url,
+            elapsedMs: Date.now() - startedAt,
+        });
 
         if (!response.ok) {
             const authError = new AuthError(`Login failed: ${response.status} ${response.statusText}`, response.status, response);
@@ -124,6 +151,10 @@ export class TokenManager {
         }
 
         const body = await response.json().catch(() => ({}));
+        this.debugAuth('login response body parsed', {
+            parser: this.config.parseLogin ? 'custom' : 'auto-detect',
+            bodyKeys: body && typeof body === 'object' ? Object.keys(body) : [],
+        });
 
         // Parse response
         let bundle: TokenBundle;
@@ -132,13 +163,27 @@ export class TokenManager {
                 ? this.config.parseLogin(body)
                 : autoDetectFields(body, this.config.fields);
         } catch (error: any) {
+            this.debugAuth('login response parsing failed', {
+                message: error.message,
+                bodyKeys: body && typeof body === 'object' ? Object.keys(body) : [],
+            });
             const authError = new AuthError(`Invalid login response: ${error.message}`, response.status, response);
             if (options?.onError) await options.onError(authError, ctx);
             throw authError;
         }
 
+        this.debugAuth('login bundle parsed', this.describeBundle(bundle));
+        this.debugAuth('storing login tokens', {
+            storage: this.getStorageType(),
+            accessExpiresAt: bundle.accessExpiresAt,
+            secondsUntilExpiry: bundle.accessExpiresAt - Math.floor(Date.now() / 1000),
+        });
+
         // Store in the configured backend
         await this.storeTokens(ctx, bundle);
+        this.debugAuth('login tokens stored', {
+            storage: this.getStorageType(),
+        });
 
         // Call onLogin callback if provided
         if (options?.onLogin) {
@@ -205,7 +250,11 @@ export class TokenManager {
      * Internal refresh implementation
      */
     private async performRefresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, extraHeaders?: Record<string, string>): Promise<TokenBundle | null> {
-        const url = this.joinURL(this.baseURL, this.config.refresh);
+        const url = this.withQueryParams(
+            this.joinURL(this.baseURL, this.config.refresh),
+            this.config.refreshParams,
+            options?.params
+        );
 
         const contentType = this.config.contentType || 'application/json';
         const headers: Record<string, string> = {
@@ -240,6 +289,7 @@ export class TokenManager {
             refreshField,
             bodyKeys: sanitizedDataKeys,
             headerKeys: Object.keys(headers),
+            queryParamKeys: this.getMergedParamKeys(this.config.refreshParams, options?.params),
         });
 
         let response: Response;
@@ -527,8 +577,26 @@ export class TokenManager {
         }
 
         const tokens = retrieveCookieTokens(ctx, this.config.cookies);
+        const now = Math.floor(Date.now() / 1000);
 
-        if (!this.hasRequiredTokens(tokens) || isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
+        if (!this.hasRequiredTokens(tokens)) {
+            this.debugAuth('getSession found incomplete token record, clearing auth state', {
+                tokens: this.describeStoredTokens(tokens, now),
+            });
+            clearCookieTokens(ctx, this.config.cookies);
+            return null;
+        }
+
+        const expired = isExpired(tokens.expiresAt, now, this.config.policy);
+        if (expired) {
+            const policy = normalizePolicy(this.config.policy);
+            this.debugAuth('getSession found expired token, clearing auth state', {
+                now,
+                expiresAt: tokens.expiresAt,
+                secondsUntilExpiry: tokens.expiresAt - now,
+                clockSkew: policy.clockSkew,
+                adjustedSecondsUntilExpiry: tokens.expiresAt - (now + Number(policy.clockSkew)),
+            });
             clearCookieTokens(ctx, this.config.cookies);
             return null;
         }
@@ -541,17 +609,33 @@ export class TokenManager {
      */
     async getSessionAsync(ctx: TokenKitContext): Promise<Session | null> {
         const tokens = await this.retrieveTokens(ctx);
+        const now = Math.floor(Date.now() / 1000);
 
         if (!this.hasRequiredTokens(tokens)) {
             if (this.isSessionStorage() && !this.hasAnyTokenData(tokens)) {
+                this.debugAuth('getSessionAsync found no TokenKit session data');
                 return null;
             }
 
+            this.debugAuth('getSessionAsync found incomplete token record, clearing auth state', {
+                tokens: this.describeStoredTokens(tokens, now),
+            });
             await this.clearTokens(ctx);
             return null;
         }
 
-        if (isExpired(tokens.expiresAt, Math.floor(Date.now() / 1000), this.config.policy)) {
+        const expired = isExpired(tokens.expiresAt, now, this.config.policy);
+        if (expired) {
+            const policy = normalizePolicy(this.config.policy);
+            this.debugAuth('getSessionAsync found expired token', {
+                storage: this.getStorageType(),
+                willClear: this.config.storage?.type !== 'session' || !tokens.refreshToken,
+                now,
+                expiresAt: tokens.expiresAt,
+                secondsUntilExpiry: tokens.expiresAt - now,
+                clockSkew: policy.clockSkew,
+                adjustedSecondsUntilExpiry: tokens.expiresAt - (now + Number(policy.clockSkew)),
+            });
             if (this.config.storage?.type !== 'session' || !tokens.refreshToken) {
                 await this.clearTokens(ctx);
             }
@@ -612,6 +696,15 @@ export class TokenManager {
         }
 
         logger.debug(`[TokenKit][refresh] ${message}`, !!this.config.debug);
+    }
+
+    private debugAuth(message: string, details?: Record<string, any>): void {
+        if (details) {
+            logger.debug(`[TokenKit][auth] ${message}`, !!this.config.debug, details);
+            return;
+        }
+
+        logger.debug(`[TokenKit][auth] ${message}`, !!this.config.debug);
     }
 
     private describeToken(token: string | null | undefined): Record<string, any> {
@@ -698,5 +791,42 @@ export class TokenManager {
         const b = base.endsWith('/') ? base : base + '/';
         const p = path.startsWith('/') ? path.slice(1) : path;
         return b + p;
+    }
+
+    private withQueryParams(url: string, ...paramsList: Array<Record<string, any> | undefined>): string {
+        const mergedParams = Object.assign({}, ...paramsList.filter(Boolean));
+        if (!Object.keys(mergedParams).length) return url;
+
+        const urlObj = new URL(url);
+        Object.entries(mergedParams).forEach(([key, value]) => {
+            if (value === undefined || value === null) return;
+
+            if (Array.isArray(value)) {
+                urlObj.searchParams.delete(key);
+                value.forEach(item => {
+                    if (item !== undefined && item !== null) {
+                        urlObj.searchParams.append(key, String(item));
+                    }
+                });
+                return;
+            }
+
+            urlObj.searchParams.set(key, String(value));
+        });
+
+        return urlObj.toString();
+    }
+
+    private getMergedParamKeys(...paramsList: Array<Record<string, any> | undefined>): string[] {
+        const keys = new Set<string>();
+        paramsList.forEach((params) => {
+            if (!params) return;
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    keys.add(key);
+                }
+            });
+        });
+        return Array.from(keys);
     }
 }

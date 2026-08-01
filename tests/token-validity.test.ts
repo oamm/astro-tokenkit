@@ -214,4 +214,28 @@ describe('TokenManager token validity', () => {
         expect(serializedLogs).not.toContain('new-access-secret');
         expect(serializedLogs).not.toContain('new-refresh-secret');
     });
+
+    it('logs why read-only session checks reject expired tokens without exposing token values', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const debugManager = new TokenManager({
+            ...config,
+            debug: true,
+        }, 'https://api.example.com');
+        const ctx = createCookieContext({
+            access_token: 'expired-access-secret',
+            refresh_token: 'expired-refresh-secret',
+            access_expires_at: String(now - 60),
+        });
+        const spy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+        expect(debugManager.getSession(ctx as any)).toBeNull();
+        const serializedLogs = spy.mock.calls.flat().map((entry) => JSON.stringify(entry)).join('\n');
+        spy.mockRestore();
+
+        expect(serializedLogs).toContain('[TokenKit][auth] getSession found expired token, clearing auth state');
+        expect(serializedLogs).toContain('secondsUntilExpiry');
+        expect(serializedLogs).toContain('adjustedSecondsUntilExpiry');
+        expect(serializedLogs).not.toContain('expired-access-secret');
+        expect(serializedLogs).not.toContain('expired-refresh-secret');
+    });
 });

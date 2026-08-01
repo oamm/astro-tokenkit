@@ -130,7 +130,9 @@ const specializedClient = createClient({
 | `contentType` | `'application/json' \| 'application/x-www-form-urlencoded'` | Content type for auth requests (default: `application/json`). |
 | `headers` | `Record<string, string>` | Extra headers for login/refresh requests. |
 | `loginData` | `Record<string, any>` | Extra data to be sent with login request. |
+| `loginParams` | `Record<string, any>` | Query parameters to be sent with login request. |
 | `refreshData` | `Record<string, any>` | Extra data to be sent with refresh request. |
+| `refreshParams` | `Record<string, any>` | Query parameters to be sent with refresh request. |
 | `refreshRequestField` | `string` | Field name for the refresh token in the refresh request (default: `refreshToken`). |
 | `fields` | `FieldMapping` | Custom mapping for token fields in API responses (`accessToken`, `refreshToken`, `expiresAt`, `expiresIn`, `tokenType`, `sessionPayload`). |
 | `parseLogin` | `Function` | Custom parser for login response: `(body: any) => TokenBundle`. |
@@ -253,6 +255,17 @@ export default defineConfig({
 | `onError` | `Function` | Callback after failed login: `(error, ctx) => void`. |
 | `headers` | `Record<string, string>` | Extra headers for this specific login request. |
 | `data` | `Record<string, any>` | Extra data for this specific login request. |
+| `params` | `Record<string, any>` | Query parameters for this specific login request. |
+
+For auth servers that accept token lifetime in the login URL, pass it as a query parameter instead of baking a specific field name into TokenKit:
+
+```typescript
+await api.login({ username, password }, {
+  params: {
+    token_duration_minutes: 30
+  }
+});
+```
 
 ### Request Auth Overrides
 

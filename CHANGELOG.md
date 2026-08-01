@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.46 - 2026-08-01
+
+- Added configurable login and refresh URL query parameters with `auth.loginParams`, `auth.refreshParams`, and per-request `params` overrides.
+- Supported login calls such as `api.login(credentials, { params: { token_duration_minutes: 30 } })` without hardcoding auth-server-specific parameter names.
+- Added sanitized auth debug diagnostics for login requests, token storage timing, and read-only session expiry decisions to help diagnose invalid tokens caused by duration or clock-skew rules.
+- Added regression coverage for auth URL query parameters and sanitized expired-token logging.
+
 ## 1.0.45 - 2026-07-30
 
 - Added detailed debug diagnostics throughout the token refresh flow, including storage state, expiry timing, policy decisions, request/response timing, parser status, and token persistence events.

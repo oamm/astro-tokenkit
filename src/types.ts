@@ -143,6 +143,8 @@ export type OnErrorCallback = (error: AuthError, ctx: TokenKitContext) => void |
 export interface AuthOptions {
     /** Extra data for this specific auth request (login/refresh) */
     data?: Record<string, any>;
+    /** Query parameters for this specific auth request */
+    params?: Record<string, any>;
     /** Request timeout in ms for this auth request */
     timeout?: number;
 }
@@ -196,8 +198,14 @@ export interface AuthConfig {
     /** Extra data for login request */
     loginData?: Record<string, any>;
 
+    /** Query parameters for login request */
+    loginParams?: Record<string, any>;
+
     /** Extra data for refresh request */
     refreshData?: Record<string, any>;
+
+    /** Query parameters for refresh request */
+    refreshParams?: Record<string, any>;
 
     /** Field name for refresh token in refresh request (default: 'refreshToken') */
     refreshRequestField?: string;
