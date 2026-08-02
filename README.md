@@ -186,9 +186,20 @@ Session storage uses `ctx.session.get/set/delete` and writes the token bundle un
 storage: { type: 'session', key: 'auth_tokens' }
 ```
 
-Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage. To get a valid session and refresh expired tokens when possible, use `await api.getValidSessionAsync()`. In multi-page sites, keep the TokenKit middleware enabled so every page request can run the refresh policy before page code reads the session.
+Because Astro session reads are asynchronous, use `await api.getSessionAsync()` in routes when `storage.type` is `'session'`. The synchronous `api.getSession()` helper only supports cookie storage. To get a valid session and refresh expired tokens when possible, use `await api.getValidSessionAsync()`. To manually trigger a refresh even when the current access token is still valid, use `await api.refreshSessionAsync()`. In multi-page sites, keep the TokenKit middleware enabled so every page request can run the refresh policy before page code reads the session.
 
 `getSessionAsync()` is a read-only helper: it returns `null` for an expired access token, but when a refresh token is still present in Astro session storage it leaves the session record intact so middleware or `getValidSessionAsync()` can renew it.
+
+For debugging refresh behavior manually:
+
+```typescript
+import { api } from 'astro-tokenkit';
+
+const session = await api.refreshSessionAsync({
+  headers: { 'x-debug-refresh': '1' },
+  data: { source: 'manual-debug' },
+});
+```
 
 If you are not using Astro's built-in session provider, pass a custom provider:
 

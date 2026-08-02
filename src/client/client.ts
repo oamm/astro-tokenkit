@@ -6,6 +6,7 @@ import type {
     AuthOptions,
     ClientConfig,
     LoginOptions,
+    RefreshOptions,
     RequestConfig,
     RequestOptions,
     SendOptions,
@@ -684,6 +685,17 @@ export class APIClient {
 
         const context = getContextStore();
         return this.tokenManager.ensure(context, options);
+    }
+
+    /**
+     * Manually refresh the current session, even if the access token is still valid
+     */
+    async refreshSessionAsync(options?: RefreshOptions): Promise<Session | null> {
+        if (!this.tokenManager) return null;
+
+        const context = getContextStore();
+        const { headers, ...authOptions } = options ?? {};
+        return this.tokenManager.ensure(context, authOptions, headers, true);
     }
 
 }

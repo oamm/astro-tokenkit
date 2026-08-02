@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createClient, defineMiddleware, setConfig } from '../src';
+import { createClient, defineMiddleware, runWithContext, setConfig } from '../src';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { APIContext } from 'astro';
 
@@ -143,6 +143,50 @@ describe('APIClient with global config', () => {
         expect(mockAstro.cookies.delete).toHaveBeenCalledWith('access_token', expect.anything());
         expect(mockAstro.cookies.delete).toHaveBeenCalledWith('refresh_token', expect.anything());
         expect(mockAstro.cookies.delete).toHaveBeenCalledWith('_tk_idle_logout', { path: '/' });
+    });
+
+    it('should manually refresh an unexpired session', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        (mockAstro.cookies.get as any).mockImplementation((name: string) => {
+            if (name === 'access_token') return { value: 'current-access' };
+            if (name === 'refresh_token') return { value: 'current-refresh' };
+            if (name === 'access_expires_at') return { value: String(now + 3600) };
+            return null;
+        });
+
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            auth: {
+                login: '/login',
+                refresh: '/refresh',
+            },
+        });
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            url: 'https://api.example.com/refresh',
+            json: () => Promise.resolve({
+                access_token: 'new-access',
+                refresh_token: 'new-refresh',
+                expires_in: 3600,
+            }),
+        });
+
+        const session = await runWithContext(mockAstro as any, () => client.refreshSessionAsync({
+            headers: { 'x-debug-refresh': '1' },
+        }));
+
+        expect(session?.accessToken).toBe('new-access');
+        expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/refresh', expect.objectContaining({
+            headers: expect.objectContaining({
+                'x-debug-refresh': '1',
+            }),
+        }));
+        expect(mockAstro.cookies.set).toHaveBeenCalledWith('access_token', 'new-access', expect.anything());
+        expect(mockAstro.cookies.set).toHaveBeenCalledWith('refresh_token', 'new-refresh', expect.anything());
     });
 
     it('should skip runWithContext in middleware if getContextStore is defined globally', async () => {

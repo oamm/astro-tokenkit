@@ -38,6 +38,7 @@ export type {
     ErrorInterceptor,
     TokenKitContext,
     TokenKitConfig,
+    RefreshOptions,
     LoginOptions,
     OnLoginCallback,
     OnErrorCallback,

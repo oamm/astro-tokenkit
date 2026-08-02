@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.49 - 2026-08-02
+
+- Added `api.refreshSessionAsync()` to manually force a refresh even when the current access token is still valid.
+- Added per-call manual refresh headers through `RefreshOptions` for debugging tenant-specific or diagnostic refresh requests.
+- Documented manual refresh usage and added regression coverage for forced refresh of an unexpired session.
+
 ## 1.0.48 - 2026-08-01
 
 - Added dynamic `resolveHeaders(ctx, options)` support for regular API requests, login, refresh, and logout.

@@ -164,6 +164,14 @@ export interface AuthOptions {
 }
 
 /**
+ * Manual refresh options
+ */
+export interface RefreshOptions extends AuthOptions {
+    /** Extra headers for this specific refresh request */
+    headers?: Record<string, string>;
+}
+
+/**
  * Login options
  */
 export interface LoginOptions extends AuthOptions {
