@@ -111,6 +111,7 @@ const specializedClient = createClient({
 | `baseURL` | `string` | **Required.** Base URL for all requests. |
 | `auth` | `AuthConfig` | Optional authentication configuration. |
 | `headers` | `Record<string, string>` | Default headers for all requests. |
+| `resolveHeaders` | `Function` | Resolve dynamic headers from the current Astro context for login, refresh, logout, and regular requests. |
 | `timeout` | `number` | Request timeout in milliseconds (default: 30000). |
 | `retry` | `RetryConfig` | Retry strategy for failed requests. |
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
@@ -129,6 +130,7 @@ const specializedClient = createClient({
 | `logout` | `string` | Endpoint path for logout (POST). |
 | `contentType` | `'application/json' \| 'application/x-www-form-urlencoded'` | Content type for auth requests (default: `application/json`). |
 | `headers` | `Record<string, string>` | Extra headers for login/refresh requests. |
+| `resolveHeaders` | `Function` | Resolve dynamic headers from the current Astro context for auth requests. |
 | `loginData` | `Record<string, any>` | Extra data to be sent with login request. |
 | `loginParams` | `Record<string, any>` | Query parameters to be sent with login request. |
 | `refreshData` | `Record<string, any>` | Extra data to be sent with refresh request. |
@@ -141,6 +143,27 @@ const specializedClient = createClient({
 | `cookies` | `CookieConfig` | Configuration for auth cookies. |
 | `storage` | `TokenStorageConfig` | Token storage backend. Use `{ type: 'cookie' }` (default) or `{ type: 'session' }`. |
 | `policy` | `RefreshPolicy` | Strategy for when to trigger token refresh. |
+
+#### Dynamic Headers
+
+Use `resolveHeaders` when headers depend on the incoming Astro request, such as a tenant header. The resolver runs for `login`, `refresh`, `logout`, and regular `request` calls.
+
+```typescript
+tokenKit({
+  baseURL: 'https://api.example.com',
+  resolveHeaders: (ctx, { operation, request }) => {
+    const tenant = ctx.request.headers.get('x-tenant-name');
+
+    return tenant ? { 'x-tenant-name': tenant } : {};
+  },
+  auth: {
+    login: '/auth/login',
+    refresh: '/auth/refresh'
+  }
+});
+```
+
+Headers are merged in this order: static client headers, static auth headers for auth requests, resolved headers, then per-request headers. Automatic refresh requests include resolved headers in their single-flight key, so concurrent refreshes for different tenants are not collapsed into one request.
 
 #### Token Storage
 

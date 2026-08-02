@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.48 - 2026-08-01
+
+- Added dynamic `resolveHeaders(ctx, options)` support for regular API requests, login, refresh, and logout.
+- Included resolved refresh headers in the refresh single-flight key so tenant-specific refreshes are isolated.
+- Added regression coverage for dynamic headers sourced from the current Astro request context.
+
 ## 1.0.47 - 2026-08-01
 
 - Added ISO timestamps to TokenKit logger output using the `[TokenKit] [timestamp]` prefix format.

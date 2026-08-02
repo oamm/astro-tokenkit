@@ -48,6 +48,11 @@ export function setConfig(userConfig: TokenKitConfig): void {
     if (finalConfig.auth) {
         const authConfig = {
             ...finalConfig.auth,
+            headers: {
+                ...finalConfig.headers,
+                ...finalConfig.auth.headers,
+            },
+            resolveHeaders: finalConfig.auth.resolveHeaders ?? finalConfig.resolveHeaders,
             fetch: finalConfig.auth.fetch ?? finalConfig.fetch,
             dangerouslyIgnoreCertificateErrors: finalConfig.auth.dangerouslyIgnoreCertificateErrors ?? finalConfig.dangerouslyIgnoreCertificateErrors,
         };

@@ -65,6 +65,20 @@ export interface RequestConfig extends RequestOptions {
     body?: BodyInit | null;
 }
 
+export type HeaderResolverOperation = 'request' | 'login' | 'refresh' | 'logout';
+
+export interface HeaderResolverOptions {
+    /** Current outbound operation. */
+    operation: HeaderResolverOperation;
+    /** Outbound request config. Present for regular API requests. */
+    request?: RequestConfig;
+}
+
+export type HeaderResolver = (
+    ctx: TokenKitContext,
+    options: HeaderResolverOptions
+) => Record<string, string> | undefined | null | Promise<Record<string, string> | undefined | null>;
+
 export type BodyMethod = 'POST' | 'PUT' | 'PATCH';
 
 export interface SendOptions extends RequestOptions {
@@ -194,6 +208,9 @@ export interface AuthConfig {
 
     /** Extra headers for login/refresh requests */
     headers?: Record<string, string>;
+
+    /** Resolve dynamic headers for auth requests from the current request context */
+    resolveHeaders?: HeaderResolver;
 
     /** Extra data for login request */
     loginData?: Record<string, any>;
@@ -415,6 +432,9 @@ export interface ClientConfig {
 
     /** Default headers for all requests */
     headers?: Record<string, string>;
+
+    /** Resolve dynamic headers for outbound requests from the current request context */
+    resolveHeaders?: HeaderResolver;
 
     /** Default timeout in ms */
     timeout?: number;

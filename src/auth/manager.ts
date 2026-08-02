@@ -1,7 +1,7 @@
 // packages/astro-tokenkit/src/auth/manager.ts
 
 import {APIResponse, AuthError} from '../types';
-import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions } from '../types';
+import type { TokenBundle, Session, AuthConfig, TokenKitContext, AuthOptions, LoginOptions, HeaderResolverOperation } from '../types';
 import { autoDetectFields, parseJWTPayload } from './detector';
 import { storeTokens, retrieveTokens, retrieveCookieTokens, clearTokens, clearCookieTokens } from './storage';
 import { normalizePolicy, shouldRefresh, isExpired } from './policy';
@@ -82,9 +82,11 @@ export class TokenManager {
         );
 
         const contentType = this.config.contentType || 'application/json';
+        const resolvedHeaders = await this.resolveHeaders(ctx, 'login');
         const headers: Record<string, string> = {
             'Content-Type': contentType,
             ...this.config.headers,
+            ...resolvedHeaders,
             ...options?.headers,
         };
 
@@ -204,10 +206,15 @@ export class TokenManager {
      * Perform token refresh
      */
     async refresh(ctx: TokenKitContext, refreshToken: string, options?: AuthOptions, headers?: Record<string, string>): Promise<TokenBundle | null> {
-        const flightKey = this.createFlightKey(refreshToken);
+        const resolvedHeaders = await this.resolveHeaders(ctx, 'refresh');
+        const extraHeaders = {
+            ...resolvedHeaders,
+            ...headers,
+        };
+        const flightKey = this.createFlightKey(refreshToken, options, extraHeaders);
         this.debugRefresh('refresh requested', {
             refreshToken: this.describeToken(refreshToken),
-            extraHeaderKeys: headers ? Object.keys(headers) : [],
+            extraHeaderKeys: Object.keys(extraHeaders),
             hasOptionData: !!options?.data,
             timeout: options?.timeout ?? this.config.timeout ?? 30000,
         });
@@ -216,7 +223,7 @@ export class TokenManager {
                 refreshToken: this.describeToken(refreshToken),
             });
             try {
-                const bundle = await this.performRefresh(ctx, refreshToken, options, headers);
+                const bundle = await this.performRefresh(ctx, refreshToken, options, extraHeaders);
                 if (bundle) {
                     this.debugRefresh('refresh succeeded', this.describeBundle(bundle));
                     if (this.config.onRefresh) {
@@ -538,7 +545,11 @@ export class TokenManager {
             try {
                 const url = this.joinURL(this.baseURL, this.config.logout);
                 const session = await this.ensure(ctx);
-                const headers: Record<string, string> = {};
+                const resolvedHeaders = await this.resolveHeaders(ctx, 'logout');
+                const headers: Record<string, string> = {
+                    ...this.config.headers,
+                    ...resolvedHeaders,
+                };
 
                 if (session?.accessToken) {
                     const injectFn = this.config.injectToken ?? ((token, type) => `${type ?? 'Bearer'} ${token}`);
@@ -664,9 +675,27 @@ export class TokenManager {
     /**
      * Create flight key for single-flight deduplication
      */
-    private createFlightKey(token: string): string {
+    private createFlightKey(token: string, options?: AuthOptions, headers?: Record<string, string>): string {
         // Avoid weak hashing of sensitive tokens
-        return `refresh_${token}`;
+        return `refresh_${token}_${this.stableStringify({
+            headers,
+            data: options?.data,
+            params: options?.params,
+        })}`;
+    }
+
+    private async resolveHeaders(ctx: TokenKitContext, operation: HeaderResolverOperation): Promise<Record<string, string>> {
+        const headers = await this.config.resolveHeaders?.(ctx, { operation });
+        return headers ?? {};
+    }
+
+    private stableStringify(value: unknown): string {
+        if (value === undefined) return 'undefined';
+        if (value === null || typeof value !== 'object') return JSON.stringify(value);
+        if (Array.isArray(value)) return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+
+        const record = value as Record<string, unknown>;
+        return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`).join(',')}}`;
     }
 
     private storeTokens(ctx: TokenKitContext, bundle: TokenBundle): Promise<void> {

@@ -82,6 +82,11 @@ export class APIClient {
             // Merge client-level fetch, SSL and debug settings into auth config
             const authConfig: AuthConfig = {
                 ...config.auth,
+                headers: {
+                    ...config.headers,
+                    ...config.auth.headers,
+                },
+                resolveHeaders: config.auth.resolveHeaders ?? config.resolveHeaders,
                 fetch: config.auth.fetch ?? config.fetch,
                 dangerouslyIgnoreCertificateErrors: config.auth.dangerouslyIgnoreCertificateErrors ?? config.dangerouslyIgnoreCertificateErrors,
                 debug: config.auth.debug ?? config.debug,
@@ -483,8 +488,13 @@ export class APIClient {
      * Build request headers
      */
     private async buildHeaders(config: RequestConfig, ctx: TokenKitContext, targetURL: string): Promise<HeadersInit> {
+        const resolvedHeaders = await this.config.resolveHeaders?.(ctx, {
+            operation: 'request',
+            request: config,
+        });
         const headers: Record<string, string> = {
             ...this.config.headers,
+            ...resolvedHeaders,
             ...config.headers,
         };
 
