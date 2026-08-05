@@ -36,6 +36,7 @@ export class APIClient {
     private _localTokenManager?: TokenManager;
     private _lastUsedAuth?: AuthConfig;
     private _lastUsedBaseURL?: string;
+    private etagCache = new Map<string, APIResponse<any>>();
 
     constructor(config?: Partial<TokenKitConfig>) {
         this.customConfig = config;
@@ -327,6 +328,15 @@ export class APIClient {
         // Build headers
         const headers = await this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
 
+        const etagEnabled = requestConfig.etag === true;
+        const cachedResponse = method === 'GET' && etagEnabled
+            ? this.etagCache.get(fullURL)
+            : undefined;
+        if (cachedResponse && !this.hasHeader(headers, 'If-None-Match')) {
+            const etag = cachedResponse.headers.get('etag');
+            if (etag) headers['If-None-Match'] = etag;
+        }
+
         // Build request init
         const init: RequestInit = {
             method,
@@ -379,19 +389,29 @@ export class APIClient {
                 logger.debug('[TokenKit] Force refresh failed or returned no session', !!debug);
             }
 
+            // A 304 has no response body. Reuse the last successful representation
+            // while exposing the current response metadata to the caller.
+            if (response.status === 304 && cachedResponse) {
+                const notModifiedResponse: APIResponse<T> = {
+                    ...cachedResponse,
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                    url: fullURL,
+                    ok: true,
+                };
+                return this.applyResponseInterceptors(notModifiedResponse, ctx);
+            }
+
             // Parse response
             const apiResponse = await this.parseResponse<T>(response, fullURL, effectiveRequestConfig);
 
-            // Apply response interceptors
-            if (this.config.interceptors?.response) {
-                let interceptedResponse = apiResponse;
-                for (const interceptor of this.config.interceptors.response) {
-                    interceptedResponse = await interceptor(interceptedResponse, ctx);
-                }
-                return interceptedResponse;
+            if (method === 'GET' && etagEnabled && response.headers.get('etag')) {
+                this.etagCache.set(fullURL, apiResponse);
             }
 
-            return apiResponse;
+            // Apply response interceptors
+            return this.applyResponseInterceptors(apiResponse, ctx);
         } catch (error) {
             clearTimeout(timeoutId);
 
@@ -420,6 +440,17 @@ export class APIClient {
      */
     private async parseResponse<T>(response: Response, url: string, request: RequestConfig): Promise<APIResponse<T>> {
         let data: T;
+
+        if (response.status === 304) {
+            return {
+                data: undefined as T,
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+                url,
+                ok: true,
+            };
+        }
 
         // Try to parse JSON
         const contentType = response.headers.get('content-type');
@@ -509,6 +540,20 @@ export class APIClient {
         }
 
         return headers;
+    }
+
+    private hasHeader(headers: Record<string, string>, name: string): boolean {
+        return Object.keys(headers).some((key) => key.toLowerCase() === name.toLowerCase());
+    }
+
+    private async applyResponseInterceptors<T>(response: APIResponse<T>, ctx: TokenKitContext): Promise<APIResponse<T>> {
+        if (!this.config.interceptors?.response) return response;
+
+        let interceptedResponse = response;
+        for (const interceptor of this.config.interceptors.response) {
+            interceptedResponse = await interceptor(interceptedResponse, ctx);
+        }
+        return interceptedResponse;
     }
 
     /**

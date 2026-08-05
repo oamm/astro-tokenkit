@@ -41,6 +41,8 @@ export interface Session {
 export interface RequestOptions {
     /** Additional headers */
     headers?: Record<string, string>;
+    /** Enable conditional GET requests using ETag responses for this request. */
+    etag?: boolean;
     /** Request timeout in ms */
     timeout?: number;
     /** Query parameters */

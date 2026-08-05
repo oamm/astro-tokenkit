@@ -79,6 +79,41 @@ describe('APIClient with global config', () => {
         });
     });
 
+    it('should use ETags for conditional GET requests', async () => {
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                headers: new Headers({
+                    'content-type': 'application/json',
+                    etag: '"widgets-v1"',
+                }),
+                json: () => Promise.resolve({ widgets: ['one'] }),
+            })
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 304,
+                statusText: 'Not Modified',
+                headers: new Headers({ etag: '"widgets-v1"' }),
+            });
+        global.fetch = fetchMock;
+
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+        });
+
+        const first = await runWithContext(mockAstro as any, () => client.get('/widgets', { etag: true }));
+        const second = await runWithContext(mockAstro as any, () => client.get('/widgets', { etag: true }));
+
+        expect(first.data).toEqual({ widgets: ['one'] });
+        expect(second.data).toEqual(first.data);
+        expect(second.status).toBe(304);
+        expect(fetchMock.mock.calls[1][1].headers).toEqual(
+            expect.objectContaining({ 'If-None-Match': '"widgets-v1"' })
+        );
+    });
+
     it('should use middleware to bind context and rotate tokens via global config', async () => {
         setConfig({
             baseURL: 'https://api.example.com',

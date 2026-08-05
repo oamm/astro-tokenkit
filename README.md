@@ -121,6 +121,20 @@ const specializedClient = createClient({
 | `setContextStore`| `(ctx) => void`| Custom method to set the context store. |
 | `runWithContext`| `Function`| Custom runner to bind context. |
 
+#### ETag Requests
+
+Pass `etag: true` on an individual GET request to enable conditional caching. When a response includes an `ETag` header, TokenKit caches that response for the client instance and sends `If-None-Match` on later ETag-enabled requests for the same URL. A `304 Not Modified` response returns the cached response data with the latest response metadata.
+
+```typescript
+const api = createClient({
+  baseURL: 'https://api.example.com',
+});
+
+const { data } = await api.get('/widgets', { etag: true });
+```
+
+ETag support applies to GET requests only and is disabled unless explicitly requested.
+
 ### Auth Configuration
 
 | Property | Type | Description |
