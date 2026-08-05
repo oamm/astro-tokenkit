@@ -135,6 +135,23 @@ const { data } = await api.get('/widgets', { etag: true });
 
 ETag support applies to GET requests only and is disabled unless explicitly requested.
 
+ETag handling is server-side because TokenKit runs in Astro's server environment. The upstream `ETag` is available on `result.headers`, but it is not automatically added to the browser's response. To populate the browser cache, forward the header from your Astro route:
+
+```typescript
+const result = await api.get('/widgets', { etag: true });
+const etag = result.headers.get('etag');
+
+return new Response(JSON.stringify(result.data), {
+  status: 200,
+  headers: {
+    'Content-Type': 'application/json',
+    ...(etag ? { ETag: etag } : {}),
+  },
+});
+```
+
+For browser-side conditional requests, the route must also handle the browser's `If-None-Match` header and return `304 Not Modified` when appropriate.
+
 ### Auth Configuration
 
 | Property | Type | Description |
