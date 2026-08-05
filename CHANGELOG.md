@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.52 - 2026-08-05
+
+- Reworked ETag caching into a generic, consumer-configurable integration.
+- Added custom cache providers, key resolvers, response policies, and explicit invalidation through `invalidateEtagCache()`.
+- Kept ETag behavior opt-in for GET requests and excluded mutation requests from conditional header handling.
+- Added coverage for custom keys, cache policies, replacement, 304 reuse, invalidation, and non-GET behavior.
+
 ## 1.0.51 - 2026-08-05
 
 - Scoped ETag support to individual GET requests with `{ etag: true }`, preventing conditional requests from being forced across an entire client.

@@ -116,6 +116,9 @@ const specializedClient = createClient({
 | `retry` | `RetryConfig` | Retry strategy for failed requests. |
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
 | `idle` | `IdleConfig` | Inactivity session timeout configuration. |
+| `etagCache` | `EtagCacheProvider` | Optional consumer-owned ETag cache provider. |
+| `etagKeyResolver` | `(url, headers) => string` | Resolves keys for opted-in GET requests. |
+| `shouldCacheResponse` | `(request, response) => boolean` | Decides whether an ETag response is stored. |
 | `context` | `AsyncLocalStorage` | External AsyncLocalStorage instance. |
 | `getContextStore`| `() => TokenKitContext`| Custom method to retrieve the context store. |
 | `setContextStore`| `(ctx) => void`| Custom method to set the context store. |
@@ -123,17 +126,37 @@ const specializedClient = createClient({
 
 #### ETag Requests
 
-Pass `etag: true` on an individual GET request to enable conditional caching. When a response includes an `ETag` header, TokenKit caches that response for the client instance and sends `If-None-Match` on later ETag-enabled requests for the same URL. A `304 Not Modified` response returns the cached response data with the latest response metadata.
+Pass `etag: true` on an individual GET request to enable conditional caching. Configure `etagCache`, `etagKeyResolver`, and optionally `shouldCacheResponse` when cache storage, key boundaries, or response rules must be controlled by the consumer. The default cache is in-memory and isolated to the client instance.
 
 ```typescript
 const api = createClient({
   baseURL: 'https://api.example.com',
+  etagKeyResolver: (url, headers) => `${url}|${headers['x-cache-scope'] ?? ''}`,
 });
 
 const { data } = await api.get('/widgets', { etag: true });
 ```
 
 ETag support applies to GET requests only and is disabled unless explicitly requested.
+
+Cache providers implement `get(key)`, `set(key, entry)`, and `delete(key)`, with optional `clear()`. The `shouldCacheResponse(request, response)` callback controls storage and receives parsed response headers, status, and body. Use `await api.invalidateEtagCache({ key })` or `await api.invalidateEtagCache()` after consumer-defined mutations.
+
+```typescript
+const cache = new Map<string, { etag: string; body: any }>();
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  etagCache: {
+    get: (key) => cache.get(key),
+    set: (key, entry) => { cache.set(key, entry); },
+    delete: (key) => { cache.delete(key); },
+    clear: () => { cache.clear(); },
+  },
+  etagKeyResolver: (url, headers) => `${url}|${headers['x-cache-scope'] ?? ''}`,
+  shouldCacheResponse: (_request, response) => response.status === 200,
+});
+```
+
+TokenKit does not infer tenant, user, session, locale, service, or feature boundaries. Define those boundaries in `etagKeyResolver` and invalidate affected keys from consumer mutation handling.
 
 ETag handling is server-side because TokenKit runs in Astro's server environment. The upstream `ETag` is available on `result.headers`, but it is not automatically added to the browser's response. To populate the browser cache, forward the header from your Astro route:
 

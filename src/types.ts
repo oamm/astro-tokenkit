@@ -55,6 +55,32 @@ export interface RequestOptions {
     auth?: AuthOptions;
 }
 
+export interface EtagCacheEntry<T = any> {
+    etag: string;
+    body: APIResponse<T>;
+}
+
+export interface EtagCacheProvider {
+    get(key: string): EtagCacheEntry | undefined | Promise<EtagCacheEntry | undefined>;
+    set(key: string, entry: EtagCacheEntry): void | Promise<void>;
+    delete(key: string): void | Promise<void>;
+    clear?(): void | Promise<void>;
+}
+
+export type EtagKeyResolver = (
+    resolvedURL: string,
+    effectiveHeaders: Record<string, string>,
+) => string;
+
+export type ShouldCacheResponse = (
+    request: RequestConfig,
+    response: APIResponse,
+) => boolean | Promise<boolean>;
+
+export interface EtagCacheInvalidationOptions {
+    key?: string;
+}
+
 /**
  * Request configuration
  */
@@ -475,6 +501,10 @@ export interface ClientConfig {
 
     /** Enable debug logging */
     debug?: boolean;
+
+    etagCache?: EtagCacheProvider;
+    etagKeyResolver?: EtagKeyResolver;
+    shouldCacheResponse?: ShouldCacheResponse;
 
     /** Dangerously ignore certificate errors (bypass SSL validation) */
     dangerouslyIgnoreCertificateErrors?: boolean;

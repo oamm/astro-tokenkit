@@ -5,6 +5,8 @@ import type {
     AuthConfig,
     AuthOptions,
     ClientConfig,
+    EtagCacheEntry,
+    EtagCacheInvalidationOptions,
     LoginOptions,
     RefreshOptions,
     RequestConfig,
@@ -36,7 +38,7 @@ export class APIClient {
     private _localTokenManager?: TokenManager;
     private _lastUsedAuth?: AuthConfig;
     private _lastUsedBaseURL?: string;
-    private etagCache = new Map<string, APIResponse<any>>();
+    private defaultEtagCache = new Map<string, EtagCacheEntry>();
 
     constructor(config?: Partial<TokenKitConfig>) {
         this.customConfig = config;
@@ -327,13 +329,16 @@ export class APIClient {
 
         // Build headers
         const headers = await this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
+        if (method !== 'GET') this.removeHeader(headers, 'if-none-match');
 
-        const etagEnabled = requestConfig.etag === true;
+        const etagEnabled = method === 'GET' && requestConfig.etag === true;
+        const etagKey = etagEnabled ? this.resolveEtagKey(fullURL, headers) : undefined;
+        const cache = etagEnabled ? this.getEtagCache() : undefined;
         const cachedResponse = method === 'GET' && etagEnabled
-            ? this.etagCache.get(fullURL)
+            ? await cache!.get(etagKey!)
             : undefined;
         if (cachedResponse && !this.hasHeader(headers, 'If-None-Match')) {
-            const etag = cachedResponse.headers.get('etag');
+            const etag = cachedResponse.etag;
             if (etag) headers['If-None-Match'] = etag;
         }
 
@@ -393,10 +398,10 @@ export class APIClient {
             // while exposing the current response metadata to the caller.
             if (response.status === 304 && cachedResponse) {
                 const notModifiedResponse: APIResponse<T> = {
-                    ...cachedResponse,
+                    ...cachedResponse.body,
                     status: response.status,
                     statusText: response.statusText,
-                    headers: response.headers,
+                    headers: this.headersWithCachedEtag(response.headers, cachedResponse.etag),
                     url: fullURL,
                     ok: true,
                 };
@@ -406,8 +411,9 @@ export class APIClient {
             // Parse response
             const apiResponse = await this.parseResponse<T>(response, fullURL, effectiveRequestConfig);
 
-            if (method === 'GET' && etagEnabled && response.headers.get('etag')) {
-                this.etagCache.set(fullURL, apiResponse);
+            if (etagEnabled && response.status === 200 && response.headers.get('etag') &&
+                (!this.config.shouldCacheResponse || await this.config.shouldCacheResponse(effectiveRequestConfig, apiResponse))) {
+                await cache!.set(etagKey!, { etag: response.headers.get('etag')!, body: apiResponse });
             }
 
             // Apply response interceptors
@@ -435,22 +441,42 @@ export class APIClient {
         }
     }
 
+    private getEtagCache() {
+        const configured = this.config.etagCache;
+        if (configured) return configured;
+        return {
+            get: (key: string) => this.defaultEtagCache.get(key),
+            set: (key: string, entry: EtagCacheEntry) => { this.defaultEtagCache.set(key, entry); },
+            delete: (key: string) => { this.defaultEtagCache.delete(key); },
+            clear: () => { this.defaultEtagCache.clear(); },
+        };
+    }
+
+    private resolveEtagKey(url: string, headers: Record<string, string>): string {
+        return this.config.etagKeyResolver?.(url, headers) ?? url;
+    }
+
+    private headersWithCachedEtag(headers: Headers, etag: string): Headers {
+        const result = new Headers(headers);
+        if (!result.has('etag')) result.set('etag', etag);
+        return result;
+    }
+
+    /** Invalidate an entry chosen by the consumer, or clear the configured cache. */
+    public async invalidateEtagCache(options?: EtagCacheInvalidationOptions): Promise<void> {
+        const cache = this.getEtagCache();
+        if (options?.key !== undefined) {
+            await cache.delete(options.key);
+        } else if (cache.clear) {
+            await cache.clear();
+        }
+    }
+
     /**
      * Parse response
      */
     private async parseResponse<T>(response: Response, url: string, request: RequestConfig): Promise<APIResponse<T>> {
         let data: T;
-
-        if (response.status === 304) {
-            return {
-                data: undefined as T,
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-                url,
-                ok: true,
-            };
-        }
 
         // Try to parse JSON
         const contentType = response.headers.get('content-type');
@@ -605,6 +631,12 @@ export class APIClient {
             if (key.toLowerCase() === 'content-type') {
                 delete headers[key];
             }
+        });
+    }
+
+    private removeHeader(headers: Record<string, string>, name: string): void {
+        Object.keys(headers).forEach((key) => {
+            if (key.toLowerCase() === name.toLowerCase()) delete headers[key];
         });
     }
 
