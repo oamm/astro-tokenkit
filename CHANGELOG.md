@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.51 - 2026-08-05
+
+- Scoped ETag support to individual GET requests with `{ etag: true }`, preventing conditional requests from being forced across an entire client.
+
 ## 1.0.50 - 2026-08-05
 
 - Added opt-in, per-request ETag support for conditional GET requests through `{ etag: true }`.
