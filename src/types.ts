@@ -41,6 +41,8 @@ export interface Session {
 export interface RequestOptions {
     /** Additional headers */
     headers?: Record<string, string>;
+    /** Enable conditional GET requests using ETag responses. */
+    etag?: boolean;
     /** Request timeout in ms */
     timeout?: number;
     /** Query parameters */
@@ -440,6 +442,9 @@ export interface ClientConfig {
 
     /** Default headers for all requests */
     headers?: Record<string, string>;
+
+    /** Enable conditional GET requests using ETag responses. */
+    etag?: boolean;
 
     /** Resolve dynamic headers for outbound requests from the current request context */
     resolveHeaders?: HeaderResolver;

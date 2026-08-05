@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.50 - 2026-08-05
+
+- Added opt-in ETag support for conditional GET requests through `etag` client and request options.
+- Reused cached GET response data when the server returns `304 Not Modified`.
+- Added regression coverage for ETag request and response handling.
+
 ## 1.0.49 - 2026-08-02
 
 - Added `api.refreshSessionAsync()` to manually force a refresh even when the current access token is still valid.
