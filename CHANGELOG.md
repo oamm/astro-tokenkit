@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.53 - 2026-08-05
+
+- Treat `304 Not Modified` responses as successful responses instead of throwing an API error.
+- Added regression coverage for uncached 304 responses.
+
 ## 1.0.52 - 2026-08-05
 
 - Reworked ETag caching into a generic, consumer-configurable integration.

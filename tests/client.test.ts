@@ -114,6 +114,26 @@ describe('APIClient with global config', () => {
         );
     });
 
+    it('should resolve an uncached 304 response instead of throwing', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 304,
+            statusText: 'Not Modified',
+            headers: new Headers(),
+        });
+        global.fetch = fetchMock;
+
+        const client = createClient({ baseURL: 'https://api.example.com' });
+        const result = await runWithContext(mockAstro as any, () => client.get('/widgets'));
+
+        expect(result).toMatchObject({
+            data: undefined,
+            status: 304,
+            statusText: 'Not Modified',
+            ok: true,
+        });
+    });
+
     it('should use middleware to bind context and rotate tokens via global config', async () => {
         setConfig({
             baseURL: 'https://api.example.com',

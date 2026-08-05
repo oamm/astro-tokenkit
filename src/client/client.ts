@@ -476,6 +476,19 @@ export class APIClient {
      * Parse response
      */
     private async parseResponse<T>(response: Response, url: string, request: RequestConfig): Promise<APIResponse<T>> {
+        // 304 responses intentionally have no body, and Response.ok is false for
+        // this status even though it is a valid conditional-response result.
+        if (response.status === 304) {
+            return {
+                data: undefined as T,
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+                url,
+                ok: true,
+            };
+        }
+
         let data: T;
 
         // Try to parse JSON
