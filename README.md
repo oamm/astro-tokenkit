@@ -114,7 +114,7 @@ const specializedClient = createClient({
 | `resolveHeaders` | `Function` | Resolve dynamic headers from the current Astro context for login, refresh, logout, and regular requests. |
 | `timeout` | `number` | Request timeout in milliseconds (default: 30000). |
 | `retry` | `RetryConfig` | Retry strategy for failed requests. |
-| `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. |
+| `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. Each interceptor may be a callback or an array of callbacks. |
 | `idle` | `IdleConfig` | Inactivity session timeout configuration. |
 | `etagCache` | `EtagCacheProvider` | Optional consumer-owned ETag cache provider. |
 | `etagKeyResolver` | `(url, headers) => string` | Resolves keys for opted-in GET requests. |
@@ -428,15 +428,18 @@ const { data } = await runWithContext(Astro, () => api.get('/data'));
 const api = createClient({
   baseURL: '...',
   interceptors: {
-    request: [
-      (config, ctx) => {
-        config.headers = { ...config.headers, 'X-Custom': 'Value' };
-        return config;
-      }
+    request: (config, ctx) => {
+      config.headers = { ...config.headers, 'X-Custom': 'Value' };
+      return config;
+    },
+    response: [
+      (response, ctx) => response
     ]
   }
 });
 ```
+
+Use a single callback for one interceptor or an array when multiple interceptors are needed.
 
 ### Login and Logout
 

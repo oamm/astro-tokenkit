@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.54 - 2026-08-07
+
+- Support interceptor callbacks supplied directly or as arrays for request, response, and error interception.
+- Prevent `TypeError: interceptor is not a function` when configuring a singleton response interceptor.
+- Added regression coverage for singleton request and response interceptors.
+
 ## 1.0.53 - 2026-08-05
 
 - Treat `304 Not Modified` responses as successful responses instead of throwing an API error.

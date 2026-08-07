@@ -79,11 +79,13 @@ describe('Reproduction of query param issues', () => {
     it('should fix interceptors bug', async () => {
         const client = createClient({
             interceptors: {
-                request: [
-                    async (config) => {
-                        return { ...config, url: config.url + '-intercepted' };
-                    }
-                ]
+                request: async (config) => {
+                    return { ...config, url: config.url + '-intercepted' };
+                },
+                response: async (response) => ({
+                    ...response,
+                    data: { ...response.data, intercepted: true },
+                }),
             }
         });
         global.fetch = vi.fn().mockResolvedValue({
@@ -93,12 +95,13 @@ describe('Reproduction of query param issues', () => {
             status: 200,
         });
 
-        await client.get('/test');
+        const result = await client.get('/test');
         
         expect(global.fetch).toHaveBeenCalledWith(
             expect.stringContaining('-intercepted'),
             expect.anything()
         );
+        expect(result.data).toEqual({ data: 'ok', intercepted: true });
     });
 
     it('should not leak query params to refresh request', async () => {

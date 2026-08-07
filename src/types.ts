@@ -451,9 +451,9 @@ export type ErrorInterceptor = (
  * Interceptors configuration
  */
 export interface InterceptorsConfig {
-    request?: RequestInterceptor[];
-    response?: ResponseInterceptor[];
-    error?: ErrorInterceptor[];
+    request?: RequestInterceptor | RequestInterceptor[];
+    response?: ResponseInterceptor | ResponseInterceptor[];
+    error?: ErrorInterceptor | ErrorInterceptor[];
 }
 
 /**

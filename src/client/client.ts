@@ -311,7 +311,7 @@ export class APIClient {
         // Apply request interceptors
         let requestConfig = { ...config };
         if (this.config.interceptors?.request) {
-            for (const interceptor of this.config.interceptors.request) {
+            for (const interceptor of this.normalizeInterceptors(this.config.interceptors.request)) {
                 requestConfig = await interceptor(requestConfig, ctx);
             }
         }
@@ -423,7 +423,7 @@ export class APIClient {
 
             // Apply error interceptors
             if (this.config.interceptors?.error) {
-                for (const interceptor of this.config.interceptors.error) {
+                for (const interceptor of this.normalizeInterceptors(this.config.interceptors.error)) {
                     await interceptor(error as APIError, ctx);
                 }
             }
@@ -589,10 +589,14 @@ export class APIClient {
         if (!this.config.interceptors?.response) return response;
 
         let interceptedResponse = response;
-        for (const interceptor of this.config.interceptors.response) {
+        for (const interceptor of this.normalizeInterceptors(this.config.interceptors.response)) {
             interceptedResponse = await interceptor(interceptedResponse, ctx);
         }
         return interceptedResponse;
+    }
+
+    private normalizeInterceptors<T>(interceptors: T | T[]): T[] {
+        return Array.isArray(interceptors) ? interceptors : [interceptors];
     }
 
     /**
