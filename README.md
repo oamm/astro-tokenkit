@@ -112,8 +112,8 @@ const specializedClient = createClient({
 | `auth` | `AuthConfig` | Optional authentication configuration. |
 | `headers` | `Record<string, string>` | Default headers for all requests. |
 | `resolveHeaders` | `Function` | Resolve dynamic headers from the current Astro context for login, refresh, logout, and regular requests. |
-| `timeout` | `number` | Request timeout in milliseconds (default: 30000). |
-| `retry` | `RetryConfig` | Retry strategy for failed requests. |
+| `timeout` | `number \| false` | Request timeout in milliseconds (default: 30000). Set to `false` to disable timeout handling. |
+| `retry` | `RetryConfig \| false` | Retry strategy for failed requests. Set to `false` to disable automatic retries. |
 | `interceptors`| `InterceptorsConfig` | Request/Response/Error interceptors. Each interceptor may be a callback or an array of callbacks. |
 | `idle` | `IdleConfig` | Inactivity session timeout configuration. |
 | `etagCache` | `EtagCacheProvider` | Optional consumer-owned ETag cache provider. |

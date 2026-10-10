@@ -17,8 +17,12 @@ export const DEFAULT_RETRY: Required<RetryConfig> = {
  */
 export function calculateDelay(
     attempt: number,
-    config: RetryConfig = {}
+    config: RetryConfig | false = {}
 ): number {
+    if (config === false) {
+        return 0;
+    }
+
     const { backoff = DEFAULT_RETRY.backoff, delay = DEFAULT_RETRY.delay } = config;
 
     if (backoff === 'linear') {
@@ -35,8 +39,12 @@ export function calculateDelay(
 export function shouldRetry(
     status: number | undefined,
     attempt: number,
-    config: RetryConfig = {}
+    config: RetryConfig | false = {}
 ): boolean {
+    if (config === false) {
+        return false;
+    }
+
     const {
         attempts = DEFAULT_RETRY.attempts,
         statusCodes = DEFAULT_RETRY.statusCodes,

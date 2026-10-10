@@ -134,6 +134,47 @@ describe('APIClient with global config', () => {
         });
     });
 
+    it('should disable request timeout handling when timeout is false', async () => {
+        const signal = new AbortController().signal;
+        const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'ok' }),
+        });
+        global.fetch = fetchMock;
+
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            timeout: false,
+        });
+
+        const result = await runWithContext(mockAstro as any, () => client.get('/widgets', { signal }));
+
+        expect(result.data).toEqual({ data: 'ok' });
+        expect(timeoutSpy).not.toHaveBeenCalled();
+        expect(fetchMock).toHaveBeenCalledWith('https://api.example.com/widgets', expect.objectContaining({
+            signal,
+        }));
+
+        timeoutSpy.mockRestore();
+    });
+
+    it('should disable automatic retries when retry is false', async () => {
+        const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
+        global.fetch = fetchMock;
+
+        const client = createClient({
+            baseURL: 'https://api.example.com',
+            retry: false,
+        });
+
+        await expect(runWithContext(mockAstro as any, () => client.get('/widgets'))).rejects.toThrow('network down');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it('should use middleware to bind context and rotate tokens via global config', async () => {
         setConfig({
             baseURL: 'https://api.example.com',

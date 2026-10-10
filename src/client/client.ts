@@ -370,16 +370,16 @@ export class APIClient {
 
         // Execute fetch with timeout
         const timeout = requestConfig.timeout ?? this.config.timeout ?? 30000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        const controller = timeout === false ? undefined : new AbortController();
+        const timeoutId = timeout === false ? undefined : setTimeout(() => controller!.abort(), timeout);
 
         try {
             const response = await safeFetch(fullURL, {
                 ...init,
-                signal: controller.signal,
+                ...(controller ? { signal: controller.signal } : {}),
             }, this.config);
 
-            clearTimeout(timeoutId);
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
 
             // Handle 401 (try refresh and retry once)
             if (response.status === 401 && this.tokenManager && !requestConfig.skipAuth && attempt === 1) {
@@ -419,7 +419,7 @@ export class APIClient {
             // Apply response interceptors
             return this.applyResponseInterceptors(apiResponse, ctx);
         } catch (error) {
-            clearTimeout(timeoutId);
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
 
             // Apply error interceptors
             if (this.config.interceptors?.error) {
@@ -429,7 +429,7 @@ export class APIClient {
             }
 
             // Transform errors
-            if (error instanceof Error && error.name === 'AbortError') {
+            if (timeout !== false && error instanceof Error && error.name === 'AbortError') {
                 throw new TimeoutError(`Request timeout after ${timeout}ms`, effectiveRequestConfig, error);
             }
 

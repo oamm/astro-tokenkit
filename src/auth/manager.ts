@@ -104,8 +104,8 @@ export class TokenManager {
         }
 
         const timeout = options?.timeout ?? this.config.timeout ?? 30000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        const controller = timeout === false ? undefined : new AbortController();
+        const timeoutId = timeout === false ? undefined : setTimeout(() => controller!.abort(), timeout);
 
         this.debugAuth('sending login request', {
             url,
@@ -123,7 +123,7 @@ export class TokenManager {
                 method: 'POST',
                 headers,
                 body: requestBody,
-                signal: controller.signal,
+                signal: controller?.signal,
             }, this.config);
         } catch (error: any) {
             this.debugAuth('login request threw before response', {
@@ -135,7 +135,7 @@ export class TokenManager {
             if (options?.onError) await options.onError(authError, ctx);
             throw authError;
         } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
         }
 
         this.debugAuth('login response received', {
@@ -286,8 +286,8 @@ export class TokenManager {
         }
 
         const timeout = options?.timeout ?? this.config.timeout ?? 30000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        const controller = timeout === false ? undefined : new AbortController();
+        const timeoutId = timeout === false ? undefined : setTimeout(() => controller!.abort(), timeout);
 
         this.debugRefresh('sending refresh request', {
             url,
@@ -306,7 +306,7 @@ export class TokenManager {
                 method: 'POST',
                 headers,
                 body: requestBody,
-                signal: controller.signal,
+                signal: controller?.signal,
             }, this.config);
         } catch (error: any) {
             this.debugRefresh('refresh request threw before response', {
@@ -316,7 +316,7 @@ export class TokenManager {
             });
             throw new AuthError(`Refresh request failed: ${error.message}`, undefined, undefined, undefined, error);
         } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
         }
 
         this.debugRefresh('refresh response received', {
@@ -539,8 +539,8 @@ export class TokenManager {
         // Optionally call logout endpoint
         if (this.config.logout) {
             const timeout = this.config.timeout ?? 10000;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            const controller = timeout === false ? undefined : new AbortController();
+            const timeoutId = timeout === false ? undefined : setTimeout(() => controller!.abort(), timeout);
 
             try {
                 const url = this.joinURL(this.baseURL, this.config.logout);
@@ -559,13 +559,13 @@ export class TokenManager {
                 await safeFetch(url, { 
                     method: 'POST', 
                     headers,
-                    signal: controller.signal,
+                    signal: controller?.signal,
                 }, this.config);
             } catch (error) {
                 // Ignore logout endpoint errors
                 logger.debug('[TokenKit] Logout endpoint failed:', !!this.config.debug, error);
             } finally {
-                clearTimeout(timeoutId);
+                if (timeoutId !== undefined) clearTimeout(timeoutId);
             }
         }
 

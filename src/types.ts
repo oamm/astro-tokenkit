@@ -43,8 +43,8 @@ export interface RequestOptions {
     headers?: Record<string, string>;
     /** Enable conditional GET requests using ETag responses for this request. */
     etag?: boolean;
-    /** Request timeout in ms */
-    timeout?: number;
+    /** Request timeout in ms. Set to false to disable timeout handling. */
+    timeout?: number | false;
     /** Query parameters */
     params?: Record<string, any>;
     /** Skip authentication for this request */
@@ -187,8 +187,8 @@ export interface AuthOptions {
     data?: Record<string, any>;
     /** Query parameters for this specific auth request */
     params?: Record<string, any>;
-    /** Request timeout in ms for this auth request */
-    timeout?: number;
+    /** Request timeout in ms for this auth request. Set to false to disable timeout handling. */
+    timeout?: number | false;
 }
 
 /**
@@ -205,8 +205,8 @@ export interface RefreshOptions extends AuthOptions {
 export interface LoginOptions extends AuthOptions {
     /** Extra headers for this specific login request */
     headers?: Record<string, string>;
-    /** Request timeout in ms for this login request */
-    timeout?: number;
+    /** Request timeout in ms for this login request. Set to false to disable timeout handling. */
+    timeout?: number | false;
     /** Callback after successful login */
     onLogin?: OnLoginCallback;
     /** Callback after failed login */
@@ -274,8 +274,8 @@ export interface AuthConfig {
     /** Custom token injection function (default: Bearer) */
     injectToken?: (token: string, type?: string) => string;
 
-    /** Request timeout in ms for auth requests (login, refresh, logout) */
-    timeout?: number;
+    /** Request timeout in ms for auth requests (login, refresh, logout). Set to false to disable timeout handling. */
+    timeout?: number | false;
 
     /** Refresh policy */
     policy?: RefreshPolicy;
@@ -472,11 +472,11 @@ export interface ClientConfig {
     /** Resolve dynamic headers for outbound requests from the current request context */
     resolveHeaders?: HeaderResolver;
 
-    /** Default timeout in ms */
-    timeout?: number;
+    /** Default timeout in ms. Set to false to disable timeout handling. */
+    timeout?: number | false;
 
-    /** Retry configuration */
-    retry?: RetryConfig;
+    /** Retry configuration. Set to false to disable automatic retries. */
+    retry?: RetryConfig | false;
 
     /** Interceptors */
     interceptors?: InterceptorsConfig;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.55 - 2026-10-09
+
+- Added explicit `timeout: false` support for API, login, refresh, and logout requests to disable timeout handling globally or per request.
+- Added explicit `retry: false` support to disable automatic API request retries globally or for custom clients.
+- Documented timeout and retry opt-out configuration and added regression coverage.
+
 ## 1.0.54 - 2026-08-07
 
 - Support interceptor callbacks supplied directly or as arrays for request, response, and error interception.
