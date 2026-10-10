@@ -124,6 +124,45 @@ const specializedClient = createClient({
 | `setContextStore`| `(ctx) => void`| Custom method to set the context store. |
 | `runWithContext`| `Function`| Custom runner to bind context. |
 
+#### Retry Configuration
+
+By default, TokenKit retries failed API requests up to 3 attempts for network errors and HTTP `408`, `429`, `500`, `502`, `503`, and `504` responses. Retry delays use exponential backoff starting at 1000 ms.
+
+```typescript
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  retry: {
+    attempts: 3,
+    statusCodes: [408, 429, 500, 502, 503, 504],
+    backoff: 'exponential',
+    delay: 1000,
+  },
+});
+```
+
+Use linear backoff when you want predictable delay growth between attempts.
+
+```typescript
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  retry: {
+    attempts: 5,
+    statusCodes: [429, 503],
+    backoff: 'linear',
+    delay: 500,
+  },
+});
+```
+
+Set `retry: false` to disable automatic retries explicitly.
+
+```typescript
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  retry: false,
+});
+```
+
 #### ETag Requests
 
 Pass `etag: true` on an individual GET request to enable conditional caching. Configure `etagCache`, `etagKeyResolver`, and optionally `shouldCacheResponse` when cache storage, key boundaries, or response rules must be controlled by the consumer. The default cache is in-memory and isolated to the client instance.
