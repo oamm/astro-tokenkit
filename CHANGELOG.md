@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.56 - 2026-11-01
+
+- Added optional JSON and raw request bodies to DELETE requests while preserving bodyless calls.
+- Exported `DeleteOptions` and documented DELETE request usage.
+
 ## 1.0.55 - 2026-10-09
 
 - Added explicit `timeout: false` support for API, login, refresh, and logout requests to disable timeout handling globally or per request.
