@@ -5,6 +5,7 @@ import type {
     AuthConfig,
     AuthOptions,
     ClientConfig,
+    DeleteOptions,
     EtagCacheEntry,
     EtagCacheInvalidationOptions,
     LoginOptions,
@@ -262,9 +263,9 @@ export class APIClient {
     }
 
     /**
-     * DELETE request
+     * DELETE request with optional JSON data or raw body in options.
      */
-    async delete<T = any>(url: string, options?: RequestOptions): Promise<APIResponse<T>> {
+    async delete<T = any>(url: string, options?: DeleteOptions): Promise<APIResponse<T>> {
         return this.request<T>({
             method: 'DELETE',
             url,
@@ -350,10 +351,10 @@ export class APIClient {
         };
 
         // Add body for appropriate methods
-        const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
+        const methodsWithNoBody = ['GET', 'HEAD'];
         if (requestConfig.body !== undefined && requestConfig.body !== null && !methodsWithNoBody.includes(method)) {
             init.body = requestConfig.body;
-        } else if (requestConfig.data && !methodsWithNoBody.includes(method)) {
+        } else if (requestConfig.data !== undefined && !methodsWithNoBody.includes(method)) {
             init.body = JSON.stringify(requestConfig.data);
 
             // Add Content-Type if not already present

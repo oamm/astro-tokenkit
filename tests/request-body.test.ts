@@ -95,7 +95,7 @@ describe('Request body and headers for various methods', () => {
         }));
     });
 
-    const methodsWithNoBody = ['GET', 'HEAD', 'DELETE'];
+    const methodsWithNoBody = ['GET', 'HEAD'];
 
     methodsWithNoBody.forEach(method => {
         it(`should NOT send body or Content-Type for ${method} requests even if data is provided`, async () => {
@@ -148,7 +148,7 @@ describe('Request body and headers for various methods', () => {
         });
     });
 
-    const methodsWithBody = ['POST', 'PUT', 'PATCH'];
+    const methodsWithBody = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
     methodsWithBody.forEach(method => {
         it(`should send body and Content-Type for ${method} requests when data is provided`, async () => {
@@ -198,6 +198,63 @@ describe('Request body and headers for various methods', () => {
             const headers = init.headers as any;
             expect(headers['Content-Type']).toBeUndefined();
         });
+    });
+
+    it.each([
+        { options: undefined, expectedBody: undefined },
+        { options: { params: { force: true } }, expectedBody: undefined },
+        { options: { data: { ids: [1, 2] } }, expectedBody: '{"ids":[1,2]}' },
+        { options: { data: false }, expectedBody: 'false' },
+        { options: { data: 0 }, expectedBody: '0' },
+        { options: { data: '' }, expectedBody: '""' },
+        { options: { data: null }, expectedBody: 'null' },
+    ])('should support DELETE options $options', async ({ options, expectedBody }) => {
+        const fetchSpy = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+        global.fetch = fetchSpy;
+
+        const result = await als.run(mockAstro, () => api.delete('/items', options));
+
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(url).toBe(`https://api.example.com/items${options?.params ? '?force=true' : ''}`);
+        expect(init.method).toBe('DELETE');
+        expect(init.body).toBe(expectedBody);
+        expect(init.headers['Content-Type']).toBe(expectedBody === undefined ? undefined : 'application/json');
+        expect(result.status).toBe(204);
+    });
+
+    it('should prefer a raw DELETE body and preserve request options', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+        global.fetch = fetchSpy;
+
+        await als.run(mockAstro, () => api.delete('/items', {
+            body: '1,2',
+            data: { ignored: true },
+            headers: { 'Content-Type': 'text/plain', 'x-reason': 'cleanup' },
+            params: { force: true },
+            skipAuth: true,
+        }));
+
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(url).toBe('https://api.example.com/items?force=true');
+        expect(init.body).toBe('1,2');
+        expect(init.headers).toEqual(expect.objectContaining({
+            'Content-Type': 'text/plain', 'x-reason': 'cleanup',
+        }));
+    });
+
+    it('should normalize lowercase DELETE and send its JSON data', async () => {
+        const fetchSpy = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+        global.fetch = fetchSpy;
+
+        await als.run(mockAstro, () => api.request({
+            method: 'delete' as any,
+            url: '/items',
+            data: { ids: [1] },
+        }));
+
+        const [, init] = fetchSpy.mock.calls[0];
+        expect(init.method).toBe('DELETE');
+        expect(init.body).toBe('{"ids":[1]}');
     });
 
     it('should send raw octet-stream bodies without JSON serialization', async () => {

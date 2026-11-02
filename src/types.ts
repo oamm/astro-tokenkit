@@ -93,6 +93,9 @@ export interface RequestConfig extends RequestOptions {
     body?: BodyInit | null;
 }
 
+/** DELETE options. Omit data and body to send a request without a payload. */
+export type DeleteOptions = Omit<RequestConfig, 'method' | 'url'>;
+
 export type HeaderResolverOperation = 'request' | 'login' | 'refresh' | 'logout';
 
 export interface HeaderResolverOptions {

@@ -20,6 +20,7 @@ export type {
     CookieConfig,
     RetryConfig,
     RequestOptions,
+    DeleteOptions,
     EtagCacheEntry,
     EtagCacheProvider,
     EtagKeyResolver,

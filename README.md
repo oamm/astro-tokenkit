@@ -102,6 +102,30 @@ const specializedClient = createClient({
 });
 ```
 
+### DELETE requests
+
+Call `delete(url)` without a body, or pass `data` in the options for a JSON payload.
+Existing options such as headers, query parameters, and authentication work in both cases.
+
+```typescript
+await api.delete('/items/123');
+await api.delete('/items/123', { params: { force: true } });
+await api.delete('/items', {
+  data: { ids: [123, 456] },
+  headers: { 'x-reason': 'cleanup' },
+});
+
+// Raw bodies are sent as-is; provide the appropriate Content-Type.
+await api.delete('/items', {
+  body: '123,456',
+  headers: { 'Content-Type': 'text/plain' },
+});
+```
+
+`data` is JSON-serialized and defaults to `Content-Type: application/json`.
+A non-null `body` takes precedence over `data`. Omit both to send no body.
+This also applies to `api.request({ method: 'DELETE', url, data })`.
+
 ## Configuration
 
 ### Client Configuration
