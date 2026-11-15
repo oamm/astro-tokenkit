@@ -55,6 +55,13 @@ export interface RequestOptions {
     auth?: AuthOptions;
 }
 
+/** Options for an unbuffered GET. HTTP errors are returned as Response objects. */
+export type StreamOptions = Omit<RequestOptions, 'etag'> & { etag?: false };
+
+/** Header-only view: streaming interceptors cannot consume or replace the response body. */
+export type StreamResponseMetadata = Pick<Response, 'status' | 'statusText' | 'headers' | 'url' | 'ok' | 'redirected' | 'type'>;
+export type StreamResponseInterceptor = (response: StreamResponseMetadata, ctx?: TokenKitContext) => void | Promise<void>;
+
 export interface EtagCacheEntry<T = any> {
     etag: string;
     body: APIResponse<T>;
@@ -456,6 +463,8 @@ export type ErrorInterceptor = (
 export interface InterceptorsConfig {
     request?: RequestInterceptor | RequestInterceptor[];
     response?: ResponseInterceptor | ResponseInterceptor[];
+    /** Metadata-only hooks for api.stream(); parsed response interceptors are skipped. */
+    streamResponse?: StreamResponseInterceptor | StreamResponseInterceptor[];
     error?: ErrorInterceptor | ErrorInterceptor[];
 }
 

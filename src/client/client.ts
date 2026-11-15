@@ -14,6 +14,7 @@ import type {
     RequestOptions,
     SendOptions,
     Session,
+    StreamOptions,
     TokenBundle,
     TokenKitConfig,
     TokenKitContext,
@@ -28,6 +29,7 @@ import {calculateDelay, shouldRetry, sleep} from '../utils/retry';
 import {getConfig, getTokenManager} from '../config';
 import {createMiddleware} from '../middleware';
 import {safeFetch} from '../utils/fetch';
+import {requestLifetime, streamingResponse} from './stream-response';
 import {logger} from '../utils/logger';
 import {MIME_TYPES, shouldSetContentTypeHeader} from '../utils/mime';
 
@@ -122,6 +124,11 @@ export class APIClient {
             url,
             ...options,
         });
+    }
+
+    /** GET without consuming its body. The caller must consume or cancel the returned body. */
+    async stream(url: string, options?: StreamOptions): Promise<Response> {
+        return this.requestWithMode({ ...options, method: 'GET', url, etag: false }, true);
     }
 
     /**
@@ -277,6 +284,12 @@ export class APIClient {
      * Generic request method
      */
     async request<T = any>(config: RequestConfig): Promise<APIResponse<T>> {
+        return this.requestWithMode<T>(config);
+    }
+
+    private requestWithMode<T>(config: RequestConfig): Promise<APIResponse<T>>;
+    private requestWithMode(config: RequestConfig, stream: true): Promise<Response>;
+    private async requestWithMode<T>(config: RequestConfig, stream = false): Promise<APIResponse<T> | Response> {
         const ctx = getContextStore();
         let attempt = 0;
 
@@ -284,12 +297,20 @@ export class APIClient {
             attempt++;
 
             try {
-                return await this.executeRequest<T>(config, ctx, attempt);
+                config.signal?.throwIfAborted();
+                const response = await this.executeRequest<T>(config, ctx, attempt, stream);
+                if (stream && shouldRetry(response.status, attempt, this.config.retry)) {
+                    await (response as Response).body?.cancel();
+                    await sleep(calculateDelay(attempt, this.config.retry), config.signal);
+                    continue;
+                }
+                return response;
             } catch (error) {
+                if (config.signal?.aborted || (stream && error instanceof TimeoutError)) throw error;
                 // Check if we should retry
                 if (shouldRetry((error as APIError).status, attempt, this.config.retry)) {
                     const delay = calculateDelay(attempt, this.config.retry);
-                    await sleep(delay);
+                    await sleep(delay, config.signal);
                     continue;
                 }
 
@@ -305,8 +326,9 @@ export class APIClient {
     private async executeRequest<T>(
         config: RequestConfig,
         ctx: TokenKitContext,
-        attempt: number
-    ): Promise<APIResponse<T>> {
+        attempt: number,
+        stream = false
+    ): Promise<APIResponse<T> | Response> {
         const debug = this.config.debug;
 
         // Apply request interceptors
@@ -318,6 +340,7 @@ export class APIClient {
         }
 
         const method = requestConfig.method.toUpperCase();
+        requestConfig.signal?.throwIfAborted();
 
         // Ensure valid session (if auth is enabled)
         if (this.tokenManager && !requestConfig.skipAuth) {
@@ -330,9 +353,9 @@ export class APIClient {
 
         // Build headers
         const headers = await this.buildHeaders(requestConfig, ctx, fullURL) as Record<string, string>;
-        if (method !== 'GET') this.removeHeader(headers, 'if-none-match');
+        if (method !== 'GET' || stream) this.removeHeader(headers, 'if-none-match');
 
-        const etagEnabled = method === 'GET' && requestConfig.etag === true;
+        const etagEnabled = !stream && method === 'GET' && requestConfig.etag === true;
         const etagKey = etagEnabled ? this.resolveEtagKey(fullURL, headers) : undefined;
         const cache = etagEnabled ? this.getEtagCache() : undefined;
         const cachedResponse = method === 'GET' && etagEnabled
@@ -371,28 +394,41 @@ export class APIClient {
 
         // Execute fetch with timeout
         const timeout = requestConfig.timeout ?? this.config.timeout ?? 30000;
-        const controller = timeout === false ? undefined : new AbortController();
-        const timeoutId = timeout === false ? undefined : setTimeout(() => controller!.abort(), timeout);
-
+        const lifetime = requestLifetime(requestConfig, timeout);
+        let upstream: Response | undefined;
         try {
-            const response = await safeFetch(fullURL, {
+            upstream = await safeFetch(fullURL, {
                 ...init,
-                ...(controller ? { signal: controller.signal } : {}),
+                signal: stream || timeout !== false ? lifetime.signal : requestConfig.signal,
+                ...(stream ? { cache: 'no-store' as const, redirect: 'manual' as const } : {}),
             }, this.config);
-
-            if (timeoutId !== undefined) clearTimeout(timeoutId);
+            const response = upstream;
 
             // Handle 401 (try refresh and retry once)
             if (response.status === 401 && this.tokenManager && !requestConfig.skipAuth && attempt === 1) {
                 logger.debug('[TokenKit] Received 401, attempting force refresh and retry...', !!debug);
                 // Clear and try fresh session (force refresh)
                 const session = await this.tokenManager.ensure(ctx, requestConfig.auth, requestConfig.headers, true);
+                lifetime.signal.throwIfAborted();
                 if (session) {
                     logger.debug('[TokenKit] Force refresh successful, retrying request...', !!debug);
                     // Retry with new token (re-apply interceptors for the new request)
-                    return this.executeRequest<T>(config, ctx, attempt + 1);
+                    await response.body?.cancel();
+                    lifetime.finish();
+                    return this.executeRequest<T>(config, ctx, attempt + 1, stream);
                 }
                 logger.debug('[TokenKit] Force refresh failed or returned no session', !!debug);
+            }
+
+            if (stream) {
+                if (this.config.interceptors?.streamResponse) {
+                    const metadata = { status: response.status, statusText: response.statusText, headers: response.headers,
+                        url: response.url || fullURL, ok: response.ok, redirected: response.redirected, type: response.type };
+                    for (const interceptor of this.normalizeInterceptors(this.config.interceptors.streamResponse)) {
+                        await interceptor(metadata, ctx);
+                    }
+                }
+                return streamingResponse(response, lifetime);
             }
 
             // A 304 has no response body. Reuse the last successful representation
@@ -406,7 +442,9 @@ export class APIClient {
                     url: fullURL,
                     ok: true,
                 };
-                return this.applyResponseInterceptors(notModifiedResponse, ctx);
+                const intercepted = await this.applyResponseInterceptors(notModifiedResponse, ctx);
+                lifetime.finish();
+                return intercepted;
             }
 
             // Parse response
@@ -418,27 +456,25 @@ export class APIClient {
             }
 
             // Apply response interceptors
-            return this.applyResponseInterceptors(apiResponse, ctx);
+            const intercepted = await this.applyResponseInterceptors(apiResponse, ctx);
+            lifetime.finish();
+            return intercepted;
         } catch (error) {
-            if (timeoutId !== undefined) clearTimeout(timeoutId);
+            lifetime.finish();
+            const failure = lifetime.error(error);
+            if (upstream?.body && !upstream.body.locked) await upstream.body.cancel().catch(() => {});
+            if (requestConfig.signal?.aborted) throw failure;
 
             // Apply error interceptors
             if (this.config.interceptors?.error) {
                 for (const interceptor of this.normalizeInterceptors(this.config.interceptors.error)) {
-                    await interceptor(error as APIError, ctx);
+                    await interceptor(failure as APIError, ctx);
                 }
             }
 
-            // Transform errors
-            if (timeout !== false && error instanceof Error && error.name === 'AbortError') {
-                throw new TimeoutError(`Request timeout after ${timeout}ms`, effectiveRequestConfig, error);
-            }
+            if (failure instanceof APIError) throw failure;
+            throw new NetworkError((failure as Error).message, effectiveRequestConfig, failure);
 
-            if (error instanceof APIError) {
-                throw error;
-            }
-
-            throw new NetworkError((error as Error).message, effectiveRequestConfig, error);
         }
     }
 

@@ -4,6 +4,8 @@ A powerful, type-safe API client for Astro with automatic token rotation, sessio
 
 ## Features
 
+- **Streaming downloads (v1.1.0):** Authenticated, unbuffered responses with cancellation and download timeouts.
+
 - **🚀 Built for Astro:** Deep integration with Astro's middleware and context.
 - **🔄 Automatic Token Rotation:** Handles access and refresh tokens automatically behind the scenes.
 - **🔒 Secure by Default:** Uses HttpOnly cookies for token storage.
@@ -186,6 +188,65 @@ const api = createClient({
   retry: false,
 });
 ```
+
+#### Streaming downloads
+
+Available since **v1.1.0**.
+
+Use `api.stream(url, options)` (or a custom client's `stream`) for a GET that returns a native
+`Response` without reading, cloning, parsing, or caching its body. `StreamOptions` accepts the
+usual request headers, query parameters, auth options, signal, and timeout; `etag: true` is not
+supported. Existing `get()`/`request()` methods still return parsed `APIResponse<T>` values.
+
+```typescript
+const upstream = await api.stream('/reports/errors.csv', {
+  params: { revision: 3, result: 'errors' },
+  headers: { Accept: 'text/csv' },
+  signal: context.request.signal,
+  timeout: 600_000,
+});
+
+// An Astro endpoint can forward the body directly, without text(), blob(), or arrayBuffer().
+const headers = new Headers({ 'Cache-Control': 'no-store' });
+for (const name of ['Content-Type', 'Content-Disposition']) {
+  const value = upstream.headers.get(name);
+  if (value) headers.set(name, value);
+}
+return new Response(upstream.body, { status: upstream.status, headers });
+```
+
+- URL building, dynamic headers, request interceptors, safe token injection, custom fetch/TLS
+  configuration, and one forced session refresh after a 401 use the same transport as parsed requests.
+- HTTP errors (including a final 401/403) are returned as `Response` objects. Check `status`/`ok`.
+  Network failures before delivery reject the promise. Configured HTTP/network retries happen only
+  before delivery, cancelling discarded bodies. Caller cancellation and streaming timeouts do not retry.
+- Caller cancellation remains effective with a timeout enabled. The transport timeout lasts through
+  body consumption; it is released at EOF, cancellation, or failure. A body timeout rejects reads with
+  `TimeoutError`. Mid-stream failures reject body reads and never restart the download. Parsed body
+  reads are now also covered by their configured transport timeout; `timeout: false` remains supported.
+- Consume or cancel every returned body, including error responses. `response.body.cancel()` releases
+  the upstream request. Buffering is demand-driven; the application decides where bytes are written.
+- Streaming GETs use native `cache: 'no-store'`, do not use TokenKit's ETag body cache, and remove
+  `If-None-Match`. Redirects are returned with `redirect: 'manual'`, without forwarding tokens to a
+  redirected destination. Handle redirects explicitly if your application needs them.
+- Parsed `interceptors.response` are skipped for streams. Use `interceptors.streamResponse` to observe
+  headers/status with a `StreamResponseMetadata` object, which exposes no body-reading methods:
+
+```typescript
+const client = createClient({
+  baseURL: 'https://api.example.com',
+  interceptors: {
+    streamResponse: (response, context) => {
+      // This hook receives metadata for each response attempt, before body delivery.
+      const scope = response.headers.get('x-lynx-cache-invalidate-scope');
+      if (scope && context) context.cacheInvalidationScope = scope;
+    },
+  },
+});
+```
+
+Error interceptors handle transport/setup failures before delivery. Body-read errors belong to the
+consumer and do not pass through the parsed-response or request-retry pipeline.
 
 #### ETag Requests
 
