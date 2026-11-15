@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 - 2026-11-15
+
+- Add `api.stream()` / `APIClient.stream()` for authenticated, unbuffered GET responses, with exported
+  `StreamOptions`, `StreamResponseMetadata`, and `StreamResponseInterceptor` types.
+- Reuse the authenticated transport and safe fetch configuration; support one 401 refresh and
+  configured pre-delivery retries while cancelling discarded bodies. Return final HTTP errors intact.
+- Preserve demand-driven reads, abort upstream on cancellation, and propagate mid-stream failures
+  without restarting downloads. Disable ETag body caching and automatic redirects for streams.
+- Add metadata-only `interceptors.streamResponse` without invoking parsed response interceptors.
+- Combine caller cancellation with request timeouts, cover parsed body reads and streamed downloads
+  through completion, clean up listeners/timers, and make retry backoff cancellable.
+- Verify streaming behavior with regression tests and a real local HTTP stream; all 179 tests pass.
+
 ## 1.0.56 - 2026-11-01
 
 - Added optional JSON and raw request bodies to DELETE requests while preserving bodyless calls.
